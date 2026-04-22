@@ -1,0 +1,9 @@
+{
+  "name": "Remix: The Ambassadors Assembly",
+  "description": "A high-performance, full-stack church management system for The Ambassadors Assembly, featuring member tracking, financial stewardship, ministry coordination, and media management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
