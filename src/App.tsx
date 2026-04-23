@@ -65,17 +65,19 @@ function AppContent() {
           </div>
           
           <div className="flex flex-col items-center gap-2">
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white flex items-center gap-1">
-              { "AMBASSADORS".split("").map((char, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.05, duration: 0.4 }}
-                >
-                  {char}
-                </motion.span>
-              ))}
+            <h1 className="text-xl sm:text-4xl md:text-5xl font-black tracking-tighter text-white flex flex-wrap justify-center items-center gap-1 px-4 text-center">
+              <div className="flex items-center gap-1">
+                { "AMBASSADORS".split("").map((char, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 + i * 0.05, duration: 0.4 }}
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </div>
               <motion.span 
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -85,6 +87,7 @@ function AppContent() {
                 ADMIN
               </motion.span>
             </h1>
+
             
             <div className="flex items-center gap-4 w-64 h-1 bg-white/5 rounded-full overflow-hidden mt-8 relative">
               <motion.div 

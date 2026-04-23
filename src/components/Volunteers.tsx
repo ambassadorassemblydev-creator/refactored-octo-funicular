@@ -197,7 +197,7 @@ export default function Volunteers() {
               <thead>
                 <tr className="border-b border-border/50 bg-muted/10">
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volunteer</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Outreach & Impact</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Hours</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rating</th>

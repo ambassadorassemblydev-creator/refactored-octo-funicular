@@ -115,7 +115,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     { id: "approvals", icon: ClipboardCheck, label: "Approvals Center", category: "Main" },
     { id: "members", icon: Users, label: "Members", category: "Community" },
     { id: "ministries", icon: ShieldCheck, label: "Ministries", category: "Community" },
-    { id: "departments", icon: Building2, label: "Departments", category: "Community" },
+    { id: "departments", icon: Building2, label: "Outreach & Impact", category: "Community" },
     { id: "volunteers", icon: Heart, label: "Service Team", category: "Community" },
     { id: "master-rota", icon: ClipboardList, label: "Master Rota", category: "Community" },
     { id: "events", icon: Calendar, label: "Events", category: "Engagement" },

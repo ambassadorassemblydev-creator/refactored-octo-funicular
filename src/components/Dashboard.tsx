@@ -128,7 +128,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
     attendance: 0,
     giving: 0,
     ministries: 0,
-    departments: 0
+    outreachTeams: 0
   });
   const [upcomingEvents, setUpcomingEvents] = React.useState<EventItem[]>([]);
   const [recentActivity, setRecentActivity] = React.useState<ActivityItem[]>([]);
@@ -173,7 +173,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           attendance: attendanceCount || 0,
           giving: totalGiving,
           ministries: ministryCount || 0,
-          departments: departmentCount || 0
+          outreachTeams: departmentCount || 0
         });
 
         setUpcomingEvents(eventsData || []);
@@ -300,7 +300,8 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
 
       <div className="relative z-10 space-y-8">
         {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-primary p-8 md:p-12 text-primary-foreground shadow-2xl shadow-primary/20">
+      <div className="relative overflow-hidden rounded-3xl bg-primary p-6 md:p-12 text-primary-foreground shadow-2xl shadow-primary/20">
+
         <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-64 h-64 bg-black/10 rounded-full blur-2xl" />
         
@@ -310,7 +311,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
               <Zap className="w-3 h-3 fill-current" />
               Ambassadors Assembly Panel
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-tight">
               Welcome back,<br /> 
               <span className="text-white/90">
                 {profile?.title ? `${profile.title} ` : ''}
@@ -318,42 +319,47 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
                 {' '}{profile?.last_name || ''}
               </span>
             </h1>
+
             <div className="flex items-center gap-2 mt-1">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-bold uppercase tracking-widest">
                 <ShieldCheck className="w-3 h-3" />
                 {role ? role.replace('_', ' ') : 'Member'}
               </span>
             </div>
-            <p className="text-primary-foreground/80 max-w-md text-lg font-medium">
+            <p className="text-primary-foreground/80 max-w-md text-sm md:text-lg font-medium">
               Your church community is thriving. Here's a snapshot of the impact you're making today.
             </p>
-            <div className="flex gap-3">
-              <Button variant="secondary" className="rounded-xl font-bold uppercase tracking-widest text-[10px] h-11 px-6">
+
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" className="rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6">
                 Quick Actions
               </Button>
-              <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20 rounded-xl font-bold uppercase tracking-widest text-[10px] h-11 px-6">
+              <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20 rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6">
                 View Reports
               </Button>
             </div>
+
           </div>
           
-          <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
-              <Activity className="w-8 h-8 mb-2 opacity-60" />
-              <span className="text-3xl font-bold">{loading ? "..." : "98%"}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Engagement</span>
+          <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
+            <div className="bg-white/10 backdrop-blur-md p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
+              <Activity className="w-5 h-5 md:w-8 md:h-8 mb-1 md:mb-2 opacity-60" />
+              <span className="text-xl md:text-3xl font-bold">{loading ? "..." : "98%"}</span>
+              <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">Engagement</span>
             </div>
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
-              <Users className="w-8 h-8 mb-2 opacity-60" />
-              <span className="text-3xl font-bold">+{loading ? "..." : stats.members}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">New Souls</span>
+            <div className="bg-white/10 backdrop-blur-md p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
+              <Users className="w-5 h-5 md:w-8 md:h-8 mb-1 md:mb-2 opacity-60" />
+              <span className="text-xl md:text-3xl font-bold">+{loading ? "..." : stats.members}</span>
+              <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">New Souls</span>
             </div>
           </div>
+
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
         <StatCard 
           title="Total Members" 
           value={loading ? "..." : stats.members.toLocaleString()} 
@@ -391,10 +397,10 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           color="bg-amber-500"
         />
         <StatCard 
-          title="Departments" 
-          value={loading ? "..." : stats.departments.toLocaleString()} 
+          title="Outreach & Impact" 
+          value={loading ? "..." : stats.outreachTeams.toLocaleString()} 
           icon={Building2} 
-          description="Internal functional units" 
+          description="Community impact groups" 
           trend="up" 
           trendValue="+100%" 
           color="bg-indigo-500"
@@ -402,7 +408,8 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
       </div>
 
       {/* Quick Actions Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+
         {[
           { label: 'Add Member', icon: UserPlus, color: 'text-blue-500', bg: 'bg-blue-500/10', tab: 'members' },
           { label: 'New Event', icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-500/10', tab: 'events' },

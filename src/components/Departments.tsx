@@ -447,7 +447,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
         <Dialog open={!!editingDepartment} onOpenChange={(open) => !open && setEditingDepartment(null)}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Department</DialogTitle>
+              <DialogTitle>Edit Outreach Team</DialogTitle>
               <DialogDescription>Update the details for this department.</DialogDescription>
             </DialogHeader>
             {editingDepartment && (
@@ -472,20 +472,20 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Departments</h1>
-          <p className="text-muted-foreground">Internal functional units that support the church operations.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Outreach & Community Impact</h1>
+          <p className="text-muted-foreground">Teams and initiatives dedicated to church outreach and community transformation.</p>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger render={
             <Button className="shadow-lg shadow-primary/20 gap-2">
               <Plus className="w-4 h-4" />
-              Create Department
+              Create Outreach Team
             </Button>
           } />
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Department</DialogTitle>
-              <DialogDescription>Define a new operational unit for the church.</DialogDescription>
+              <DialogTitle>Create Outreach Team</DialogTitle>
+              <DialogDescription>Define a new team for community outreach and impact.</DialogDescription>
             </DialogHeader>
             <DepartmentForm
               onSuccess={() => {
@@ -502,7 +502,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search departments..."
+            placeholder="Search outreach teams..."
             className="pl-10 h-11 bg-card/50 border-none shadow-sm focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -621,7 +621,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
                         <span className="text-xs font-bold leading-none">
                           {dept.head ? `${dept.head.first_name} ${dept.head.last_name}` : "No Head Assigned"}
                         </span>
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">Department Head</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">Team Lead</span>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
@@ -637,7 +637,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
       <Dialog open={!!editingDepartment} onOpenChange={(open) => !open && setEditingDepartment(null)}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Department</DialogTitle>
+            <DialogTitle>Edit Outreach Team</DialogTitle>
             <DialogDescription>Update the details for this department.</DialogDescription>
           </DialogHeader>
           <DepartmentForm
