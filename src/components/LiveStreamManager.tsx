@@ -26,10 +26,16 @@ interface StreamForm {
   chat_enabled: boolean;
   notify_subscribers: boolean;
   status: string;
+  speaker_id?: string;
+  series_id?: string;
+  scripture_reference?: string;
+  scripture_text?: string;
 }
 
 export default function LiveStreamManager() {
   const [streams, setStreams] = React.useState<any[]>([]);
+  const [speakers, setSpeakers] = React.useState<any[]>([]);
+  const [series, setSeries] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [editingStream, setEditingStream] = React.useState<any>(null);
@@ -45,33 +51,51 @@ export default function LiveStreamManager() {
     chat_enabled: true,
     notify_subscribers: true,
     status: "scheduled",
+    speaker_id: "",
+    series_id: "",
+    scripture_reference: "",
+    scripture_text: "",
   });
 
   const [isQuickLiveOpen, setIsQuickLiveOpen] = React.useState(false);
   const [quickTitle, setQuickTitle] = React.useState("");
 
-  const fetchStreams = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("live_streams")
-      .select("*")
-      .order("scheduled_start", { ascending: false });
-    if (error) toast.error(error.message);
-    else setStreams(data || []);
+    const [streamsRes, speakersRes, seriesRes] = await Promise.all([
+      supabase.from("live_streams").select("*").order("scheduled_start", { ascending: false }),
+      supabase.from("sermon_speakers").select("id, name").order("name"),
+      supabase.from("sermon_series").select("id, title").order("title")
+    ]);
+
+    if (streamsRes.error) toast.error(streamsRes.error.message);
+    else setStreams(streamsRes.data || []);
+
+    if (speakersRes.data) setSpeakers(speakersRes.data);
+    if (seriesRes.data) setSeries(seriesRes.data);
+    
     setLoading(false);
   };
 
-  React.useEffect(() => { fetchStreams(); }, []);
+  React.useEffect(() => { fetchData(); }, []);
 
   const openNew = () => {
     setEditingStream(null);
-    setForm({ title: "", description: "", stream_url: "", embed_url: "", platform: "youtube", scheduled_start: "", scheduled_end: "", is_featured: true, chat_enabled: true, notify_subscribers: true, status: "scheduled" });
+    setForm({ title: "", description: "", stream_url: "", embed_url: "", platform: "youtube", scheduled_start: "", scheduled_end: "", is_featured: true, chat_enabled: true, notify_subscribers: true, status: "scheduled", speaker_id: "", series_id: "", scripture_reference: "", scripture_text: "" });
     setIsFormOpen(true);
   };
 
   const openEdit = (s: any) => {
     setEditingStream(s);
-    setForm({ ...s, scheduled_start: s.scheduled_start ? new Date(s.scheduled_start).toISOString().slice(0, 16) : "", scheduled_end: s.scheduled_end ? new Date(s.scheduled_end).toISOString().slice(0, 16) : "" });
+    setForm({ 
+      ...s, 
+      scheduled_start: s.scheduled_start ? new Date(s.scheduled_start).toISOString().slice(0, 16) : "", 
+      scheduled_end: s.scheduled_end ? new Date(s.scheduled_end).toISOString().slice(0, 16) : "",
+      speaker_id: s.speaker_id || "",
+      series_id: s.series_id || "",
+      scripture_reference: s.scripture_reference || "",
+      scripture_text: s.scripture_text || ""
+    });
     setIsFormOpen(true);
   };
 
@@ -81,7 +105,7 @@ export default function LiveStreamManager() {
     toast.success("🔴 You are now LIVE!", {
       description: "The stream has been featured on the main watch page.",
     });
-    fetchStreams();
+    fetchData();
   };
 
   const handleQuickGoLive = async () => {
@@ -105,21 +129,49 @@ export default function LiveStreamManager() {
     });
     setQuickTitle("");
     setIsQuickLiveOpen(false);
-    fetchStreams();
+    fetchData();
   };
 
   const handleEndStream = async (id: string) => {
+    const stream = streams.find(s => s.id === id);
     const { error } = await supabase.from("live_streams").update({ status: "ended", actual_end: new Date().toISOString() }).eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Stream ended successfully.");
-    fetchStreams();
+    
+    // Auto-archive as a sermon
+    if (stream) {
+      const sermonSlug = stream.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '') + '-' + Date.now();
+      const { error: sermonError } = await supabase.from("sermons").insert({
+        title: stream.title,
+        description: stream.description,
+        video_embed_url: stream.embed_url,
+        video_url: stream.stream_url,
+        sermon_date: stream.actual_start || stream.scheduled_start,
+        speaker_id: stream.speaker_id || null,
+        series_id: stream.series_id || null,
+        scripture_reference: stream.scripture_reference || null,
+        scripture_text: stream.scripture_text || null,
+        slug: sermonSlug,
+        status: "published",
+        service_type: "live_stream"
+      });
+      
+      if (sermonError) {
+        toast.error("Stream ended, but failed to archive sermon: " + sermonError.message);
+      } else {
+        toast.success("Stream ended and archived to sermons archive!");
+      }
+    } else {
+      toast.success("Stream ended successfully.");
+    }
+    
+    fetchData();
   };
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("live_streams").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Stream deleted.");
-    fetchStreams();
+    fetchData();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,7 +188,7 @@ export default function LiveStreamManager() {
     if (error) { toast.error(error.message); return; }
     toast.success(editingStream ? "Stream updated!" : "Stream scheduled!");
     setIsFormOpen(false);
-    fetchStreams();
+    fetchData();
   };
 
   const liveStream = streams.find(s => s.status === "live");
@@ -353,6 +405,36 @@ export default function LiveStreamManager() {
               <Label>Embed URL (for in-page player)</Label>
               <Input placeholder="https://www.youtube.com/embed/..." value={form.embed_url} onChange={e => setForm(f => ({ ...f, embed_url: e.target.value }))} />
               <p className="text-xs text-muted-foreground">For YouTube: replace /watch?v= with /embed/</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Speaker</Label>
+                <Select value={form.speaker_id || ""} onValueChange={v => setForm(f => ({ ...f, speaker_id: v || "" }))}>
+                  <SelectTrigger><SelectValue placeholder="Select Speaker" /></SelectTrigger>
+                  <SelectContent>
+                    {speakers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Sermon Series</Label>
+                <Select value={form.series_id || ""} onValueChange={v => setForm(f => ({ ...f, series_id: v || "" }))}>
+                  <SelectTrigger><SelectValue placeholder="Select Series" /></SelectTrigger>
+                  <SelectContent>
+                    {series.map(s => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label>Scripture Reference</Label>
+                <Input placeholder="e.g. Genesis 1:1-3" value={form.scripture_reference} onChange={e => setForm(f => ({ ...f, scripture_reference: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Scripture Text</Label>
+                <Textarea placeholder="The actual scripture text..." value={form.scripture_text} onChange={e => setForm(f => ({ ...f, scripture_text: e.target.value }))} className="resize-none" rows={3} />
+              </div>
             </div>
             <div className="space-y-3 pt-2">
               {[
