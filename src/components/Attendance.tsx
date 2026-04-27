@@ -41,6 +41,7 @@ interface AttendanceProfile {
   last_name: string | null;
   avatar_url?: string | null;
   member_id?: string | null;
+  email?: string | null;
 }
 
 export default function Attendance() {
@@ -51,9 +52,11 @@ export default function Attendance() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [topAttender, setTopAttender] = React.useState<{name: string, count: number} | null>(null);
 
   React.useEffect(() => {
     fetchEvents();
+    fetchTopAttender();
   }, []);
 
   React.useEffect(() => {
@@ -87,13 +90,50 @@ export default function Attendance() {
     }
   };
 
+  const fetchTopAttender = async () => {
+    try {
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('user_id, profiles(first_name, last_name)')
+        .eq('attendance', 'in_person')
+        .gte('service_date', firstDayOfMonth);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const counts: Record<string, {count: number, name: string}> = {};
+        data.forEach((r: any) => {
+          if (!counts[r.user_id]) {
+            counts[r.user_id] = { count: 0, name: `${r.profiles?.first_name || ''} ${r.profiles?.last_name || ''}`.trim() || 'Unknown' };
+          }
+          counts[r.user_id].count++;
+        });
+        
+        let top = null;
+        let max = 0;
+        for (const uid in counts) {
+          if (counts[uid].count > max) {
+            max = counts[uid].count;
+            top = counts[uid];
+          }
+        }
+        setTopAttender(top);
+      }
+    } catch (e) {
+      console.error("Failed to fetch top attender", e);
+    }
+  };
+
   const fetchMembersAndAttendance = async (eventId: string) => {
     setLoading(true);
     try {
       // Fetch all active members
       const { data: membersData, error: membersError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, avatar_url, member_id')
+        .select('id, first_name, last_name, avatar_url, member_id, email')
         .eq('status', 'active')
         .order('last_name');
 
@@ -215,6 +255,62 @@ export default function Attendance() {
     toast.success("Marked all as present");
   };
 
+  const notifyAbsentees = async () => {
+    const event = events.find(e => e.id === selectedEvent);
+    if (!event) return;
+
+    const absentees = members
+      .filter(m => (attendance[m.id] || 'absent') === 'absent' && m.email)
+      .map(m => m.email);
+
+    if (absentees.length === 0) {
+      toast.info("No absent members with emails to notify.");
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/admin/attendance/notify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          absentees,
+          eventName: event.title,
+          date: new Date(event.start_date).toLocaleDateString()
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to notify absentees');
+      const data = await response.json();
+      toast.success(`Successfully sent ${data.sent} absence notifications.`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send notifications.");
+    }
+  };
+
+  const downloadQRCode = async () => {
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent("https://ambassadors-assembly-web.onrender.com/my-account/attendance/mark")}`;
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Ambassadors-Assembly-Entrance-QR.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("QR Code downloaded successfully.");
+    } catch (error) {
+      console.error("Error downloading QR code:", error);
+      toast.error("Failed to download QR code. You can right-click the image to save it.");
+    }
+  };
+
   const filteredMembers = members.filter(m => 
     `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
     m.member_id?.toLowerCase().includes(search.toLowerCase())
@@ -235,6 +331,10 @@ export default function Attendance() {
           <p className="text-muted-foreground">Record and monitor attendance for services and events.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={notifyAbsentees} disabled={!selectedEvent}>
+            <Calendar className="w-4 h-4" />
+            Notify Absentees
+          </Button>
           <Button variant="outline" className="gap-2" onClick={handleExport}>
             <Download className="w-4 h-4" />
             Export Report
@@ -272,6 +372,20 @@ export default function Attendance() {
           </CardContent>
         </Card>
       </div>
+      
+      {topAttender && (
+        <Card className="bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border-none shadow-md rounded-2xl mb-6">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-1">Top Attender This Month</p>
+              <h3 className="text-2xl font-bold text-emerald-900">{topAttender.name}</h3>
+            </div>
+            <div className="bg-emerald-500 text-white w-12 h-12 flex items-center justify-center rounded-full font-bold shadow-lg">
+              {topAttender.count}x
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-none shadow-lg bg-card/50 backdrop-blur-md overflow-hidden print:shadow-none">
         <CardHeader className="bg-primary/5 pb-6">
@@ -283,10 +397,16 @@ export default function Attendance() {
               </CardTitle>
               <CardDescription>Print this QR code and place it at the church entrance for automated check-ins.</CardDescription>
             </div>
-            <Button variant="outline" className="gap-2 shrink-0 no-print" onClick={() => window.print()}>
-              <Printer className="w-4 h-4" />
-              Print for Entrance
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" className="gap-2 shrink-0 no-print" onClick={downloadQRCode}>
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+              <Button variant="outline" className="gap-2 shrink-0 no-print" onClick={() => window.print()}>
+                <Printer className="w-4 h-4" />
+                Print for Entrance
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-8 flex flex-col md:flex-row items-center gap-12">

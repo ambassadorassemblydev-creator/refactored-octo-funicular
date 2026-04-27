@@ -42,9 +42,19 @@ import { supabase } from "@/src/lib/supabase";
 import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function GivingGoals() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [goals, setGoals] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+
+  if (role !== 'admin' && role !== 'super_admin' && role !== 'pastor') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+        <Heart className="w-16 h-16 text-muted-foreground/30" />
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground">You do not have permission to view giving goals.</p>
+      </div>
+    );
+  }
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editingGoal, setEditingGoal] = React.useState<any>(null);
   const [viewingDonors, setViewingDonors] = React.useState<any>(null);

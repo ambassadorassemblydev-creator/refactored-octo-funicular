@@ -7,7 +7,8 @@ import {
   Users,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  HeartHandshake
 } from "lucide-react";
 import {
   Dialog,
@@ -81,6 +82,9 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
         setSelectedDept(cwData.department_id || "");
         setSelectedPosition(cwData.position_id || "");
       }
+      if (member?.ministry) {
+        setSelectedMinistry(member.ministry);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -109,10 +113,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
         }
       }
 
-      // 2. Update Title
-      updates.push(supabase.from('profiles').update({ title: selectedTitle as any }).eq('id', member.id));
-
-      // 3. Update Department (Church Workers)
+      // 2. Update Department (Church Workers)
       if (selectedDept && selectedDept !== 'none') {
         updates.push((supabase.from('church_workers') as any).upsert({
           user_id: member.id,
@@ -122,8 +123,15 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
         }, { onConflict: 'user_id' }));
       }
 
-      const results = await Promise.all(updates);
-      const errors = results.filter(r => r.error);
+      // 3. Update Profile (Title + Ministry + Department field cache)
+      updates.push(supabase.from('profiles').update({ 
+        title: selectedTitle as any,
+        ministry: (selectedMinistry !== 'none' ? selectedMinistry : null) as any,
+        department: (departments.find(d => d.id === selectedDept)?.name || null) as any
+      } as any).eq('id', member.id));
+
+      const saveResults = await Promise.all(updates);
+      const errors = saveResults.filter(r => r.error);
       
       if (errors.length > 0) {
         throw new Error(errors[0].error?.message || "Some updates failed");
@@ -135,7 +143,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
         action: 'UPDATE',
         table_name: 'profiles/roles/workers',
         record_id: member.id,
-        new_values: { role: selectedRole, title: selectedTitle, dept: selectedDept }
+        new_values: { role: selectedRole, title: selectedTitle, dept: selectedDept, ministry: selectedMinistry }
       });
 
       toast.success("Member assignments updated successfully! 🎖️");
@@ -150,10 +158,10 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] rounded-3xl border-none shadow-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[500px] rounded-3xl border-none shadow-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-primary" />
+          <DialogTitle className="text-2xl font-black flex items-center gap-2 text-primary">
+            <ShieldCheck className="w-6 h-6" />
             Manage Assignments
           </DialogTitle>
           <DialogDescription className="font-medium">
@@ -188,17 +196,22 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
             </Label>
             <Select value={selectedTitle} onValueChange={v => v && setSelectedTitle(v)}>
               <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
-                <SelectValue placeholder="Select title (e.g. Deacon)" />
+                <SelectValue placeholder="Select title" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
-                <SelectItem value="Member" className="rounded-xl">Member</SelectItem>
-                <SelectItem value="Worker" className="rounded-xl">Worker</SelectItem>
+                <SelectItem value="Mr" className="rounded-xl">Mr</SelectItem>
+                <SelectItem value="Mrs" className="rounded-xl">Mrs</SelectItem>
+                <SelectItem value="Ms" className="rounded-xl">Ms</SelectItem>
+                <SelectItem value="Dr" className="rounded-xl">Dr</SelectItem>
+                <SelectItem value="Pastor" className="rounded-xl">Pastor</SelectItem>
                 <SelectItem value="Deacon" className="rounded-xl">Deacon</SelectItem>
                 <SelectItem value="Deaconess" className="rounded-xl">Deaconess</SelectItem>
                 <SelectItem value="Elder" className="rounded-xl">Elder</SelectItem>
                 <SelectItem value="Minister" className="rounded-xl">Minister</SelectItem>
-                <SelectItem value="Pastor" className="rounded-xl">Pastor</SelectItem>
-                <SelectItem value="Reverend" className="rounded-xl">Reverend</SelectItem>
+                <SelectItem value="Bishop" className="rounded-xl">Bishop</SelectItem>
+                <SelectItem value="Evangelist" className="rounded-xl">Evangelist</SelectItem>
+                <SelectItem value="Apostle" className="rounded-xl">Apostle</SelectItem>
+                <SelectItem value="Prophet" className="rounded-xl">Prophet</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -224,7 +237,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
           </div>
 
           {/* POSITION */}
-          {selectedDept && (
+          {selectedDept && selectedDept !== 'none' && (
             <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Users className="w-3 h-3" /> Role within Department
@@ -243,6 +256,26 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
               </Select>
             </div>
           )}
+
+          {/* MINISTRY */}
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <HeartHandshake className="w-3 h-3" /> Spiritual Ministry
+            </Label>
+            <Select value={selectedMinistry} onValueChange={v => v && setSelectedMinistry(v)}>
+              <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
+                <SelectValue placeholder="Assign to ministry" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-xl">
+                <SelectItem value="none" className="rounded-xl italic">No Assignment</SelectItem>
+                {ministries.map(m => (
+                  <SelectItem key={m.id} value={m.name} className="rounded-xl">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex gap-3 pt-4">

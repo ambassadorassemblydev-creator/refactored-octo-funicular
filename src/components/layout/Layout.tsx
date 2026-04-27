@@ -76,7 +76,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }: any) => 
   >
     <Icon className={cn("w-5 h-5 shrink-0", active ? "text-primary-foreground" : "group-hover:scale-110 transition-transform")} />
     {!collapsed && <span className="text-sm font-medium">{label}</span>}
-    {active && !collapsed && <motion.div layoutId="active-pill" className="absolute left-0 w-1 h-6 bg-white rounded-r-full" />}
+    {active && <motion.div layoutId="active-pill" className="absolute left-0 w-1.5 h-8 bg-white rounded-r-full shadow-[0_0_15px_rgba(255,255,255,0.7)] z-10" style={{ top: '50%', y: '-50%' }} />}
     {active && !collapsed && <ChevronRight className="w-4 h-4 ml-auto opacity-50" />}
   </button>
 );
@@ -132,10 +132,10 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     { id: "media", icon: ImageIcon, label: "Media Gallery", category: "Resources" },
     { id: "resources", icon: Library, label: "Resource Center", category: "Resources" },
     { id: "ai-lab", icon: Sparkles, label: "AI Content Lab", category: "Resources" },
-    { id: "donations", icon: Heart, label: "Giving", category: "Finance" },
-    { id: "giving-goals", icon: Target, label: "Giving Goals", category: "Finance" },
     { id: "tasks", icon: ClipboardList, label: "Tasks", category: "Engagement" },
     ...(role === 'admin' || role === 'pastor' || role === 'super_admin' ? [
+      { id: "donations", icon: Heart, label: "Giving", category: "Finance" },
+      { id: "giving-goals", icon: Target, label: "Giving Goals", category: "Finance" },
       { id: "admin-settings", icon: Settings, label: "Settings", category: "System" },
       { id: "admin-roles", icon: ShieldCheck, label: "Roles", category: "System" },
       { id: "admin-system", icon: Server, label: "System Status", category: "System" },
@@ -152,11 +152,17 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
       <AnimatePresence>
         {loading && (
           <motion.div 
-            initial={{ scaleX: 0, opacity: 1 }}
-            animate={{ scaleX: 1, opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: "circOut" }}
-            className="fixed top-0 left-0 right-0 h-1 bg-primary z-[100] origin-left"
+            initial={{ width: "0%", opacity: 0 }}
+            animate={{ 
+              width: ["0%", "85%", "90%"],
+              opacity: 1 
+            }}
+            exit={{ width: "100%", opacity: 0 }}
+            transition={{ 
+              width: { duration: 1.2, times: [0, 0.4, 1], ease: "easeOut" },
+              opacity: { duration: 0.2 }
+            }}
+            className="fixed top-0 left-0 h-1.5 bg-gradient-to-r from-primary via-emerald-400 to-primary z-[9999] shadow-[0_2px_15px_rgba(16,185,129,0.5)]"
           />
         )}
       </AnimatePresence>

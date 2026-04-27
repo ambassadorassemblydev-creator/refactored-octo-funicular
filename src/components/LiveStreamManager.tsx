@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Radio, Youtube, Play, StopCircle, Clock, Eye, Plus, Edit2, Trash2, Globe, VideoIcon, MoreVertical, Wifi, WifiOff, Calendar } from "lucide-react";
+import { Radio, Youtube, Play, StopCircle, Clock, Eye, Plus, Edit2, Trash2, Globe, VideoIcon, MoreVertical, Wifi, WifiOff, Calendar, CheckCircle2, AlertCircle, HeartHandshake, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +14,26 @@ import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 
+interface StreamForm {
+  title: string;
+  description: string;
+  stream_url: string;
+  embed_url: string;
+  platform: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  is_featured: boolean;
+  chat_enabled: boolean;
+  notify_subscribers: boolean;
+  status: string;
+}
+
 export default function LiveStreamManager() {
   const [streams, setStreams] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [editingStream, setEditingStream] = React.useState<any>(null);
-  const [form, setForm] = React.useState({
+  const [form, setForm] = React.useState<StreamForm>({
     title: "",
     description: "",
     stream_url: "",
@@ -111,7 +125,11 @@ export default function LiveStreamManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.scheduled_start) { toast.error("Title and start time are required."); return; }
-    const payload = { ...form, scheduled_start: new Date(form.scheduled_start).toISOString(), scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null };
+    const payload = { 
+      ...form, 
+      scheduled_start: new Date(form.scheduled_start).toISOString(), 
+      scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null 
+    };
     const { error } = editingStream
       ? await supabase.from("live_streams").update(payload as any).eq("id", editingStream.id)
       : await supabase.from("live_streams").insert(payload as any);
@@ -149,9 +167,19 @@ export default function LiveStreamManager() {
           }} className="gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10">
             <Radio className="w-4 h-4" /> Go Live Now
           </Button>
-          <Button onClick={openNew} className="gap-2 shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" /> Schedule Stream
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2 h-11 rounded-xl no-print"
+              onClick={() => window.open('https://ambassadors-assembly-web.onrender.com/watch', '_blank')}
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Watch Page
+            </Button>
+            <Button onClick={openNew} className="gap-2 h-11 rounded-xl shadow-lg shadow-primary/20">
+              <Plus className="w-4 h-4" /> Schedule Stream
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -337,7 +365,7 @@ export default function LiveStreamManager() {
                     <p className="text-sm font-semibold">{toggle.label}</p>
                     <p className="text-xs text-muted-foreground">{toggle.desc}</p>
                   </div>
-                  <Switch checked={(form as any)[toggle.key]} onCheckedChange={v => setForm(f => ({ ...f, [toggle.key]: v }))} />
+                  <Switch checked={form[toggle.key as keyof StreamForm] as boolean} onCheckedChange={v => setForm(f => ({ ...f, [toggle.key]: v }))} />
                 </div>
               ))}
             </div>

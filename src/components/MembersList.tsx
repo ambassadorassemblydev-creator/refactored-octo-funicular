@@ -666,20 +666,33 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
             </div>
             
             <div className="flex-1 px-6 pb-20">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
-                  <AvatarImage src={viewingMember.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${viewingMember.id}`} />
-                  <AvatarFallback className="text-4xl">{viewingMember.first_name?.[0]}{viewingMember.last_name?.[0]}</AvatarFallback>
-                </Avatar>
+              <div className="flex flex-col items-center text-center space-y-4 pt-6">
+                <div className="relative">
+                  <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-xl">
+                    <AvatarImage src={viewingMember.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${viewingMember.id}`} />
+                    <AvatarFallback className="text-2xl sm:text-4xl">{viewingMember.first_name?.[0]}{viewingMember.last_name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className={cn(
+                    "absolute -bottom-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-background flex items-center justify-center shadow-sm",
+                    viewingMember.status === 'active' ? "bg-emerald-500" : "bg-amber-500"
+                  )}>
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                  </div>
+                </div>
                 <div>
-                  <h2 className="text-2xl font-bold">{viewingMember.first_name} {viewingMember.last_name}</h2>
-                  <div className="flex items-center justify-center gap-2 mt-2">
-                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none uppercase tracking-wider">
+                  <h2 className="text-xl sm:text-2xl font-bold">{viewingMember.first_name} {viewingMember.last_name}</h2>
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none uppercase tracking-wider text-[10px]">
                       {viewingMember.member_id || 'MEMBER'}
                     </Badge>
-                    <Badge variant={viewingMember.status === 'active' ? 'default' : 'secondary'} className="uppercase tracking-wider">
+                    <Badge variant={viewingMember.status === 'active' ? 'default' : 'secondary'} className="uppercase tracking-wider text-[10px]">
                       {viewingMember.status}
                     </Badge>
+                    {viewingMember.title && (
+                      <Badge variant="outline" className="uppercase tracking-wider text-[10px] border-primary/20 text-primary">
+                        {viewingMember.title}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -720,22 +733,22 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                   <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Users className="w-4 h-4" /> Personal Details
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-sm font-medium">Gender</p>
-                      <p className="text-sm text-muted-foreground capitalize">{viewingMember.gender || 'Not specified'}</p>
+                      <p className="text-xs font-medium text-muted-foreground">Gender</p>
+                      <p className="text-sm font-semibold capitalize">{viewingMember.gender || 'Not specified'}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-sm font-medium">Marital Status</p>
-                      <p className="text-sm text-muted-foreground capitalize">{viewingMember.marital_status || 'Not specified'}</p>
+                      <p className="text-xs font-medium text-muted-foreground">Marital Status</p>
+                      <p className="text-sm font-semibold capitalize">{viewingMember.marital_status || 'Not specified'}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-sm font-medium">Occupation</p>
-                      <p className="text-sm text-muted-foreground">{viewingMember.occupation || 'Not specified'}</p>
+                      <p className="text-xs font-medium text-muted-foreground">Occupation</p>
+                      <p className="text-sm font-semibold">{viewingMember.occupation || 'Not specified'}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-sm font-medium">Date of Birth</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs font-medium text-muted-foreground">Date of Birth</p>
+                      <p className="text-sm font-semibold">
                         {viewingMember.date_of_birth ? new Date(viewingMember.date_of_birth).toLocaleDateString() : 'Not specified'}
                       </p>
                     </div>

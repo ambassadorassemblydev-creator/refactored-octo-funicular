@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI } from "@google/genai";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -228,7 +229,7 @@ export default function AILab() {
                       className="prose prose-sm dark:prose-invert max-w-none"
                     >
                       <div className="whitespace-pre-wrap font-medium leading-relaxed text-sm">
-                        {result}
+                        <ReactMarkdown>{result}</ReactMarkdown>
                       </div>
                     </motion.div>
                   ) : (

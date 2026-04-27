@@ -378,15 +378,17 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           trendValue="+100%" 
           color="bg-emerald-500"
         />
-        <StatCard 
-          title="Total Giving" 
-          value={loading ? "..." : `₦${stats.giving.toLocaleString()}`} 
-          icon={Heart} 
-          description="Total donations received" 
-          trend="up" 
-          trendValue="+100%" 
-          color="bg-rose-500"
-        />
+        {(role === 'super_admin' || role === 'admin' || role === 'pastor') && (
+          <StatCard 
+            title="Total Giving" 
+            value={loading ? "..." : `₦${stats.giving.toLocaleString()}`} 
+            icon={Heart} 
+            description="Total donations received" 
+            trend="up" 
+            trendValue="+100%" 
+            color="bg-rose-500"
+          />
+        )}
         <StatCard 
           title="Active Ministries" 
           value={loading ? "..." : stats.ministries.toLocaleString()} 
@@ -442,7 +444,9 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase">Attendance</Button>
-              <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase">Giving</Button>
+              {(role === 'super_admin' || role === 'admin' || role === 'pastor') && (
+                <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase">Giving</Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="pl-2">

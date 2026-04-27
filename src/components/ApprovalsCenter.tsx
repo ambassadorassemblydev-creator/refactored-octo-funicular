@@ -120,7 +120,7 @@ export default function ApprovalsCenter() {
           break;
         case 'ministries':
           table = 'ministry_members';
-          updateData = { status: action === 'approve' ? 'active' : 'rejected' };
+          updateData = { status: action === 'approve' ? 'active' : 'rejected', role: action === 'approve' ? 'member' : 'rejected' };
           break;
         case 'testimonies':
         case 'prayers':
@@ -139,7 +139,10 @@ export default function ApprovalsCenter() {
         const { error } = await supabase.from('volunteer_applications').update(updateData).eq('id', id);
         if (error) throw error;
       } else if (type === 'ministries') {
-        const { error } = await (supabase.from('ministry_members') as any).update(updateData).eq('id', id);
+        const { error } = await supabase.from('ministry_members').update({ 
+          role: action === 'approve' ? 'member' : 'rejected',
+          is_active: action === 'approve'
+        }).eq('id', id);
         if (error) throw error;
       } else if (type === 'testimonies') {
         const { error } = await supabase.from('testimonies').update(updateData).eq('id', id);
@@ -149,10 +152,25 @@ export default function ApprovalsCenter() {
         if (error) throw error;
       }
 
-      // Special logic for staff approval: Upgrade role
       if (type === 'staff' && action === 'approve') {
-        // We'll handle role assignment in the MembersList dialog, 
-        // but here we just mark as approved.
+        // For staff, we might want to set a specific role or just mark as approved
+        // The user already has already_serving=true
+        await supabase.from('profiles').update({ 
+          approval_status: 'approved',
+          is_member: true 
+        }).eq('id', id);
+      } else if (type === 'volunteers' && action === 'approve') {
+        // Update profile cache for department
+        const deptName = record.church_departments?.name;
+        if (deptName) {
+          await supabase.from('profiles').update({ department: deptName } as any).eq('id', record.user_id);
+        }
+      } else if (type === 'ministries' && action === 'approve') {
+        // Update profile cache for ministry
+        const minName = record.ministries?.name;
+        if (minName) {
+          await supabase.from('profiles').update({ ministry: minName } as any).eq('id', record.user_id);
+        }
       }
 
       await auditRepo.logAction({

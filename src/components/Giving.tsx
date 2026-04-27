@@ -71,7 +71,7 @@ const chartData = [
 import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function Giving() {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, role } = useAuth();
   const [donations, setDonations] = React.useState<any[]>([]);
   const [stats, setStats] = React.useState({
     total: 0,
@@ -82,6 +82,16 @@ export default function Giving() {
   const [loading, setLoading] = React.useState(true);
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
+
+  if (!authLoading && role !== 'admin' && role !== 'super_admin' && role !== 'pastor') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-20">
+        <Heart className="w-16 h-16 text-muted-foreground/30" />
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground">You do not have permission to view giving records.</p>
+      </div>
+    );
+  }
 
   const fetchGivingData = async (retries = 3) => {
     setLoading(true);
