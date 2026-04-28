@@ -170,7 +170,7 @@ export default function ApprovalsCenter() {
         if (error) throw error;
       }
 
-      } else if (type === 'staff' && action === 'approve') {
+      if (type === 'staff' && action === 'approve') {
         const targetRole = record._selectedRole || 'worker';
         const roleId = roles.find(r => r.name === targetRole)?.id;
         
