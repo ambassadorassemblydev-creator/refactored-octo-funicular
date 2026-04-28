@@ -108,18 +108,49 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
     setApprovingId(profile.id);
     try {
       // 1. Get role id
-      const { data: roleData } = await supabase.from('roles').select('id').eq('name', targetRole).single();
+      const { data: roleData } = await supabase.from('roles').select('id, name').eq('name', targetRole).single();
       if (!roleData) throw new Error(`Role '${targetRole}' not found`);
 
       // 2. Upsert user_roles
-      await supabase.from('user_roles').upsert({ user_id: profile.id, role_id: roleData.id }, { onConflict: 'user_id' });
+      await supabase.from('user_roles').upsert({ 
+        user_id: profile.id, 
+        role_id: roleData.id,
+        is_active: true
+      }, { onConflict: 'user_id' });
 
-      // 3. Update profile approval_status
-      await supabase.from('profiles').update({
+      const updateData: any = {
         approval_status: 'approved',
+        is_member: true,
         approved_by: user?.id,
         approved_at: new Date().toISOString(),
-      }).eq('id', profile.id);
+      };
+
+      // 3. Handle Department Claim
+      if (profile.department_claim) {
+        const { data: departments } = await supabase.from('church_departments').select('id, name');
+        const matchedDept = (departments || []).find(d => 
+          d.name.toLowerCase().includes(profile.department_claim.toLowerCase()) ||
+          profile.department_claim.toLowerCase().includes(d.name.toLowerCase())
+        );
+        
+        if (matchedDept) {
+          await (supabase.from('church_workers') as any).upsert({
+            user_id: profile.id,
+            department_id: matchedDept.id,
+            status: 'active'
+          }, { onConflict: 'user_id' });
+          
+          updateData.department = matchedDept.name;
+        }
+      }
+
+      // 4. Set Title if claiming pastoral role
+      if (profile.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(profile.role_claim)) {
+        updateData.title = profile.role_claim;
+      }
+
+      // 5. Update profile
+      await supabase.from('profiles').update(updateData).eq('id', profile.id);
 
       toast.success(`${profile.first_name} has been approved as ${targetRole}! ✅`);
       fetchPendingApprovals();

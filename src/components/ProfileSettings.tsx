@@ -202,13 +202,33 @@ export default function ProfileSettings() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Member since {profile?.created_at ? new Date(profile.created_at).getFullYear() : '2024'}</p>
                 </div>
 
-                <div className="w-full space-y-3">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Personal Bio</Label>
-                  <textarea 
-                    className="w-full min-h-[120px] rounded-2xl border-none bg-background/50 p-4 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 transition-all leading-relaxed"
-                    placeholder="Tell us about your journey with Ambassadors Assembly..."
-                    {...register("bio")}
                   />
+                </div>
+
+                <div className="w-full pt-4 border-t border-muted/50 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Role</span>
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[10px] font-bold uppercase">{profile?.role || 'Member'}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Verification</span>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "border-none text-[10px] font-bold uppercase",
+                        profile?.approval_status === 'approved' ? "bg-emerald-500/10 text-emerald-600" : 
+                        profile?.approval_status === 'pending' ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {profile?.approval_status || 'Unverified'}
+                    </Badge>
+                  </div>
+                  {profile?.department && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</span>
+                      <span className="text-xs font-bold text-foreground">{profile.department}</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

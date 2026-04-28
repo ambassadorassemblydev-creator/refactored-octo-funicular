@@ -32,6 +32,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
@@ -50,6 +57,8 @@ export default function ApprovalsCenter() {
     testimonies: [],
     prayers: []
   });
+  const [roles, setRoles] = React.useState<any[]>([]);
+  const [departments, setDepartments] = React.useState<any[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -86,8 +95,17 @@ export default function ApprovalsCenter() {
         .eq('is_approved', false)
         .is('approved_at', null);
 
+      // 6. Fetch Roles and Departments for staff assignment
+      const [ { data: rData }, { data: dData } ] = await Promise.all([
+        supabase.from('roles').select('id, name'),
+        supabase.from('church_departments').select('id, name')
+      ]);
+
+      setRoles(rData || []);
+      setDepartments(dData || []);
+
       setData({
-        staff: staff || [],
+        staff: (staff || []).map(s => ({ ...s, _selectedRole: s.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(s.role_claim) ? 'pastor' : (['Elder','Deacon','Deaconess','Minister'].includes(s.role_claim) ? 'leader' : 'worker') })),
         volunteers: volunteers || [],
         ministries: ministries || [],
         testimonies: testimonies || [],
@@ -152,13 +170,49 @@ export default function ApprovalsCenter() {
         if (error) throw error;
       }
 
-      if (type === 'staff' && action === 'approve') {
-        // For staff, we might want to set a specific role or just mark as approved
-        // The user already has already_serving=true
-        await supabase.from('profiles').update({ 
-          approval_status: 'approved',
-          is_member: true 
-        }).eq('id', id);
+      } else if (type === 'staff' && action === 'approve') {
+        const targetRole = record._selectedRole || 'worker';
+        const roleId = roles.find(r => r.name === targetRole)?.id;
+        
+        if (roleId) {
+          // 1. Assign System Role
+          await supabase.from('user_roles').upsert({ 
+            user_id: id, 
+            role_id: roleId,
+            is_active: true
+          }, { onConflict: 'user_id' });
+        }
+
+        // 2. Handle Department Claim
+        if (record.department_claim) {
+          const matchedDept = departments.find(d => 
+            d.name.toLowerCase().includes(record.department_claim.toLowerCase()) ||
+            record.department_claim.toLowerCase().includes(d.name.toLowerCase())
+          );
+          
+          if (matchedDept) {
+            await (supabase.from('church_workers') as any).upsert({
+              user_id: id,
+              department_id: matchedDept.id,
+              status: 'active'
+            }, { onConflict: 'user_id' });
+            
+            // Cache in profile
+            updateData.department = matchedDept.name;
+          }
+        }
+
+        // 3. Set Title if claiming pastoral role
+        if (record.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(record.role_claim)) {
+          updateData.title = record.role_claim;
+        }
+
+        updateData.is_member = true;
+        updateData.approved_by = user?.id;
+        updateData.approved_at = new Date().toISOString();
+
+        await supabase.from('profiles').update(updateData).eq('id', id);
+
       } else if (type === 'volunteers' && action === 'approve') {
         // Update profile cache for department
         const deptName = record.church_departments?.name;
@@ -249,8 +303,35 @@ export default function ApprovalsCenter() {
                       onApprove={() => handleAction('staff', item.id, 'approve', item)}
                       onReject={() => handleAction('staff', item.id, 'reject', item)}
                     >
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-none text-[8px] font-bold uppercase">Existing Worker Claim</Badge>
+                      <div className="mt-2 space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-none text-[8px] font-bold uppercase">Existing Worker Claim</Badge>
+                          {item.role_claim && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-none text-[8px] font-bold uppercase">Claims: {item.role_claim}</Badge>}
+                          {item.department_claim && <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-none text-[8px] font-bold uppercase">{item.department_claim}</Badge>}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Assign Role:</span>
+                          <Select 
+                            value={item._selectedRole} 
+                            onValueChange={(val) => {
+                              setData((prev: any) => ({
+                                ...prev,
+                                staff: prev.staff.map((s: any) => s.id === item.id ? { ...s, _selectedRole: val } : s)
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-32 text-[10px] bg-background/50 border-none">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="worker">Worker</SelectItem>
+                              <SelectItem value="leader">Leader</SelectItem>
+                              <SelectItem value="pastor">Pastor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </ApprovalCard>
                   ))}
