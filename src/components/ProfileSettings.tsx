@@ -202,9 +202,6 @@ export default function ProfileSettings() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Member since {profile?.created_at ? new Date(profile.created_at).getFullYear() : '2024'}</p>
                 </div>
 
-                  />
-                </div>
-
                 <div className="w-full pt-4 border-t border-muted/50 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Role</span>
