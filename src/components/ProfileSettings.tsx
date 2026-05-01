@@ -263,9 +263,8 @@ export default function ProfileSettings() {
                       <span className="text-xs font-bold text-foreground">{profile.department}</span>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
             <Card className="lg:col-span-2 border-none shadow-md bg-card/50 backdrop-blur-sm rounded-3xl overflow-hidden">
               <CardHeader>
