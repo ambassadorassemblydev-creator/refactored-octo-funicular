@@ -23,6 +23,7 @@ import {
 import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { Loader2, Image as ImageIcon } from "lucide-react";
+import { ImageUpload } from "@/src/components/ui/ImageUpload";
 
 const mediaSchema = z.object({
   title: z.string().min(2, "Title is required"),
@@ -100,14 +101,13 @@ export default function MediaForm({ initialData, onSuccess, onCancel }: MediaFor
           name="url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Media URL</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="https://..." className="pl-10" {...field} />
-                </div>
-              </FormControl>
-              <FormDescription>Link to an image, video, or document.</FormDescription>
+              <ImageUpload
+                label="Media File"
+                hint="Upload an image, video thumbnail, or document cover."
+                value={field.value}
+                onChange={field.onChange}
+                folder="ambassadors_assembly/gallery"
+              />
               <FormMessage />
             </FormItem>
           )}

@@ -23,44 +23,48 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, User } from "lucide-react";
+import { ImageUpload } from "@/src/components/ui/ImageUpload";
 import { cn } from "@/src/lib/utils";
 import { auditRepo } from "@/src/lib/audit";
 import { useAuth } from "@/src/contexts/AuthContext";
+
+const dateSchema = z.preprocess((arg) => (arg === "" ? null : arg), z.string().nullable());
 
 const memberSchema = z.object({
   title: z.enum(['Mr', 'Mrs', 'Ms', 'Dr', 'Pastor', 'Deacon', 'Deaconess', 'Elder', 'Minister', 'Bishop', 'Evangelist', 'Apostle', 'Prophet']),
   first_name: z.string().min(1, "First name is required"),
   last_name: z.string().min(1, "Last name is required"),
-  middle_name: z.string().default(""),
-  preferred_name: z.string().default(""),
+  middle_name: z.string().optional().default(""),
+  preferred_name: z.string().optional().default(""),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(1, "Phone number is required"),
-  alt_phone: z.string().default(""),
-  whatsapp_number: z.string().default(""),
+  alt_phone: z.string().optional().default(""),
+  whatsapp_number: z.string().optional().default(""),
   gender: z.enum(["male", "female", "prefer_not_to_say"]),
-  date_of_birth: z.string().default(""),
+  date_of_birth: dateSchema,
   marital_status: z.enum(["single", "married", "widowed", "divorced", "prefer_not_to_say"]),
-  wedding_anniversary: z.string().default(""),
+  wedding_anniversary: dateSchema,
   member_id: z.string().min(1, "Member ID is required"),
   status: z.enum(["active", "inactive", "suspended", "pending_verification"]),
   is_member: z.boolean().default(true),
   is_baptized: z.boolean().default(false),
-  salvation_date: z.string().default(""),
-  baptism_date: z.string().default(""),
-  previous_church: z.string().default(""),
-  occupation: z.string().default(""),
-  employer: z.string().default(""),
-  bio: z.string().default(""),
+  salvation_date: dateSchema,
+  baptism_date: dateSchema,
+  previous_church: z.string().optional().default(""),
+  occupation: z.string().optional().default(""),
+  employer: z.string().optional().default(""),
+  bio: z.string().optional().default(""),
   address_line_1: z.string().min(1, "Address is required"),
-  address_line_2: z.string().default(""),
+  address_line_2: z.string().optional().default(""),
   city: z.string().min(1, "City is required"),
-  county: z.string().default(""),
-  postal_code: z.string().default(""),
-  country: z.string().default("Nigeria"),
+  county: z.string().optional().default(""),
+  postal_code: z.string().optional().default(""),
+  country: z.string().optional().default("Nigeria"),
   emergency_contact_name: z.string().min(1, "Emergency contact is required"),
   emergency_contact_phone: z.string().min(1, "Contact phone is required"),
   emergency_contact_relationship: z.string().min(1, "Relationship is required"),
+  avatar_url: z.string().optional().default(""),
 });
 
 type MemberFormValues = z.infer<typeof memberSchema>;
@@ -142,6 +146,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
       emergency_contact_name: initialData?.emergency_contact_name || "",
       emergency_contact_phone: initialData?.emergency_contact_phone || "",
       emergency_contact_relationship: initialData?.emergency_contact_relationship || "",
+      avatar_url: initialData?.avatar_url || "",
     } as MemberFormValues,
   });
 
@@ -154,12 +159,29 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
   async function onSubmit(values: MemberFormValues) {
     setLoading(true);
     try {
+      // Robustly sanitize values: Convert empty strings to null for optional fields
+      // and ensure we don't send fields that might cause issues if they haven't changed or are sensitive
+      const sanitizedValues: any = {};
+      Object.entries(values).forEach(([key, value]) => {
+        if (value === "") {
+          sanitizedValues[key] = null;
+        } else {
+          sanitizedValues[key] = value;
+        }
+      });
+
       if (initialData?.id) {
-        const { error } = await supabase
+        const { error, count } = await supabase
           .from("profiles")
-          .update(values)
-          .eq("id", initialData.id);
+          .update(sanitizedValues)
+          .eq("id", initialData.id)
+          .select(); // Added select to help verify
+        
         if (error) throw error;
+        
+        if (count === 0) {
+          throw new Error("Update failed: No changes were made. This might be due to insufficient permissions or the record not being found.");
+        }
         
         // Audit log for update
         if (currentUser) {
@@ -169,7 +191,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
             table_name: 'profiles',
             record_id: initialData.id,
             old_values: initialData,
-            new_values: values
+            new_values: sanitizedValues
           });
         }
         
@@ -186,12 +208,12 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
         const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
         
         const { data: signUpData, error: signUpError } = await tempSupabase.auth.signUp({
-          email: values.email,
+          email: sanitizedValues.email,
           password: tempPassword,
           options: {
             data: {
-              first_name: values.first_name,
-              last_name: values.last_name
+              first_name: sanitizedValues.first_name,
+              last_name: sanitizedValues.last_name
             }
           }
         });
@@ -204,7 +226,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
         // We now update it with the additional values from the form.
         const { error: updateError } = await supabase
           .from("profiles")
-          .update(values)
+          .update(sanitizedValues)
           .eq("id", newId);
         
         if (updateError) throw updateError;
@@ -216,7 +238,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
             action: 'INSERT',
             table_name: 'profiles',
             record_id: newId,
-            new_values: values
+            new_values: sanitizedValues
           });
         }
 
@@ -224,6 +246,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
       }
       onSuccess();
     } catch (error: any) {
+      console.error("MemberForm Submission Error:", error);
       toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
@@ -277,6 +300,23 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
         {/* Step 0: Basic Details */}
         {step === 0 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+            <FormField
+              control={form.control}
+              name="avatar_url"
+              render={({ field }) => (
+                <FormItem className="flex flex-col items-center justify-center mb-6">
+                  <ImageUpload
+                    label="Profile Picture"
+                    hint="Square image recommended. Upload a professional photo."
+                    value={field.value}
+                    onChange={field.onChange}
+                    folder="ambassadors_assembly/members"
+                    aspectRatio="square"
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
@@ -462,7 +502,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
                   <FormItem>
                     <FormLabel>Salvation Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -475,7 +515,7 @@ export default function MemberForm({ initialData, onSuccess, onCancel }: MemberF
                   <FormItem>
                     <FormLabel>Baptism Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

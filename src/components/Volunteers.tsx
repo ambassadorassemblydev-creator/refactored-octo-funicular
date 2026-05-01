@@ -41,7 +41,7 @@ type Volunteer = Database["public"]["Tables"]["church_workers"]["Row"] & {
 };
 
 
-export default function Volunteers() {
+export default function Volunteers({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const [volunteers, setVolunteers] = React.useState<Volunteer[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
@@ -119,7 +119,14 @@ export default function Volunteers() {
           </div>
           <p className="text-muted-foreground font-medium">Coordinate your dedicated workforce, track service hours, and recognize outstanding contributions.</p>
         </div>
-        <Button className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
+        <Button 
+          onClick={() => {
+            if (onTabChange) {
+              onTabChange('members'); // Or whichever tab handles pending approvals
+            }
+          }}
+          className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20"
+        >
           <UserPlus className="w-4 h-4" />
           Recruit Volunteer
         </Button>

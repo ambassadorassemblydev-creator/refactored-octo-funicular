@@ -191,7 +191,8 @@ export default function Tasks() {
           description: data.description,
           status: data.status,
           priority: data.priority,
-          assignee_id: data.assignee, // This is the user_id from the form
+          assignee_id: data.assignee,
+          department_id: data.department_id === 'all_depts' ? null : data.department_id,
           due_date: data.dueDate.toISOString().split('T')[0],
           category: data.category,
           subtasks: [],
@@ -222,6 +223,7 @@ export default function Tasks() {
           status: data.status,
           priority: data.priority,
           assignee_id: data.assignee,
+          department_id: data.department_id === 'all_depts' ? null : data.department_id,
           due_date: data.dueDate instanceof Date ? data.dueDate.toISOString().split('T')[0] : data.dueDate,
           category: data.category
         })
@@ -240,6 +242,7 @@ export default function Tasks() {
   };
 
   const handleDeleteTask = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
     try {
       const { error } = await supabase
         .from('tasks')
@@ -248,7 +251,7 @@ export default function Tasks() {
 
       if (error) throw error;
       fetchTasks();
-      toast.error("Task deleted");
+      toast.success("Task deleted successfully");
     } catch (error) {
       console.error("Error deleting task:", error);
       toast.error("Failed to delete task");

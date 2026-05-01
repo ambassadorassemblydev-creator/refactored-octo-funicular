@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ShieldCheck, Mail, Lock, ArrowRight, Github, Chrome } from "lucide-react";
+import { ShieldCheck, Mail, Lock, ArrowRight, ExternalLink, Chrome } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 
 export default function Login({ onLogin }: { onLogin: () => void }) {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [mode, setMode] = React.useState<'login' | 'signup'>('login');
+  const [mode] = React.useState<'login'>('login');
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [firstName, setFirstName] = React.useState("");
@@ -33,41 +33,25 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         toast.success("Logged in successfully!");
         onLogin();
       }
-    } else {
-      const { error, data } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-          }
-        }
-      });
-
-      if (error) {
-        toast.error(error.message);
-        setIsLoading(false);
-      } else {
-        toast.success("Account created! Please check your email to verify.");
-        setMode('login');
-        setIsLoading(false);
-      }
     }
+
   };
-
-  const handleOAuthLogin = async (provider: 'google' | 'github') => {
+  
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: 'google',
       options: {
-        redirectTo: window.location.origin,
-      },
+        redirectTo: window.location.origin
+      }
     });
-
     if (error) {
       toast.error(error.message);
+      setIsLoading(false);
     }
   };
+
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -114,30 +98,28 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
-              {mode === 'login' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button variant="outline" className="gap-2 h-11 rounded-xl bg-background/50 border-none shadow-sm hover:bg-background transition-all" onClick={() => handleOAuthLogin('google')}>
-                      <Chrome className="w-4 h-4" />
-                      Google
-                    </Button>
-                    <Button variant="outline" className="gap-2 h-11 rounded-xl bg-background/50 border-none shadow-sm hover:bg-background transition-all" onClick={() => handleOAuthLogin('github')}>
-                      <Github className="w-4 h-4" />
-                      GitHub
-                    </Button>
+
+              <div className="grid gap-4 mb-6">
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 text-foreground font-bold uppercase tracking-widest text-[10px] gap-3"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                >
+                  <Chrome className="w-4 h-4 text-primary" />
+                  Continue with Google
+                </Button>
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-white/5" />
                   </div>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
-                      <span className="bg-card px-2 text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div>
+                  <div className="relative flex justify-center text-[8px] uppercase tracking-[0.2em] font-bold">
+                    <span className="bg-card/60 px-2 text-muted-foreground">Or continue with email</span>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === 'signup' && (
                   <div className="grid grid-cols-2 gap-4">
@@ -209,17 +191,26 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
                 </Button>
               </form>
             </CardContent>
-            <CardFooter>
-              <p className="text-center text-xs text-muted-foreground w-full">
-                {mode === 'login' ? "Don't have an account?" : "Already have an account?"}{" "}
+            <CardFooter className="flex flex-col gap-4">
+              <div className="w-full h-px bg-white/5" />
+              <div className="text-center space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">New Administrator?</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  To maintain system integrity, all administrative accounts must first be registered on our 
+                  <span className="text-primary font-bold"> Main Church Platform</span>.
+                </p>
                 <Button 
-                  variant="link" 
-                  className="px-0 font-bold text-primary"
-                  onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+                  variant="outline" 
+                  className="w-full h-11 rounded-xl border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 font-bold uppercase tracking-widest text-[10px] gap-2"
+                  onClick={() => window.open('https://ambassadors-assembly.vercel.app/signup', '_blank')}
                 >
-                  {mode === 'login' ? 'Sign up' : 'Log in'}
+                  Register on Main Site
+                  <ExternalLink className="w-3 h-3" />
                 </Button>
-              </p>
+                <p className="text-[9px] text-muted-foreground/60 italic">
+                  Once registered, return here to sign in with your credentials.
+                </p>
+              </div>
             </CardFooter>
           </Card>
         </motion.div>

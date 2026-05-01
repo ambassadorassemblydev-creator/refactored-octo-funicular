@@ -11,6 +11,7 @@ import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { useAuth } from "@/src/contexts/AuthContext";
+import SendEmailDialog from "./SendEmailDialog";
 
 export default function ContactInbox() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function ContactInbox() {
   const [filter, setFilter] = React.useState("all");
   const [replyText, setReplyText] = React.useState("");
   const [stats, setStats] = React.useState({ total: 0, unread: 0, replied: 0 });
+  const [emailDialog, setEmailDialog] = React.useState({ open: false, to: "", subject: "" });
 
   const fetchSubmissions = async () => {
     setLoading(true);
@@ -114,7 +116,7 @@ export default function ContactInbox() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search by name, email or subject..." className="pl-10 h-11 bg-card/50 border-none shadow-sm" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={(val) => setFilter(val || "all")}>
           <SelectTrigger className="w-full md:w-48 h-11 bg-card/50 border-none shadow-sm">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue />
@@ -230,11 +232,11 @@ export default function ContactInbox() {
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
-                  <Button onClick={handleReply} className="gap-2 flex-1">
-                    <Reply className="w-4 h-4" /> Mark as Replied
+                  <Button onClick={() => setEmailDialog({ open: true, to: selected.email, subject: `Re: ${selected.subject || 'Enquiry'}` })} className="gap-2 flex-1">
+                    <Mail className="w-4 h-4" /> Direct Reply
                   </Button>
-                  <Button variant="outline" onClick={() => { navigator.clipboard.writeText(selected.email); toast.success("Email copied!"); }} className="gap-2">
-                    <Mail className="w-4 h-4" /> Copy Email
+                  <Button variant="outline" onClick={handleReply} className="gap-2">
+                    <CheckCircle2 className="w-4 h-4" /> Log Note
                   </Button>
                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(selected.id)}>
                     <Trash2 className="w-4 h-4" />
@@ -245,6 +247,13 @@ export default function ContactInbox() {
           )}
         </DialogContent>
       </Dialog>
+
+      <SendEmailDialog 
+        open={emailDialog.open}
+        onOpenChange={(open) => setEmailDialog(prev => ({ ...prev, open }))}
+        defaultTo={emailDialog.to}
+        defaultSubject={emailDialog.subject}
+      />
     </div>
   );
 }

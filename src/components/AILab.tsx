@@ -23,14 +23,16 @@ import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI } from "@google/genai";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/src/lib/supabase";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 interface AIHistoryItem {
+  id?: string;
   type: string;
   prompt: string;
   result: string;
-  date: Date;
+  created_at: string;
 }
 
 export default function AILab() {
@@ -39,6 +41,25 @@ export default function AILab() {
   const [result, setResult] = React.useState("");
   const [history, setHistory] = React.useState<AIHistoryItem[]>([]);
   const [activeTab, setActiveTab] = React.useState("sermon");
+
+  const fetchHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (error) {
+      console.error("Error fetching AI history:", error);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const generateContent = async (type: string) => {
     if (!prompt && type === "custom") {
@@ -78,7 +99,22 @@ export default function AILab() {
 
       const text = response.text || "No response generated.";
       setResult(text);
-      setHistory(prev => [{ type, prompt: userPrompt, result: text, date: new Date() }, ...prev]);
+      
+      // Save to database
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const { error } = await supabase
+          .from('ai_history')
+          .insert([{
+            user_id: userData.user.id,
+            type,
+            prompt: userPrompt,
+            result: text
+          }]);
+        
+        if (!error) fetchHistory();
+      }
+
       toast.success("Content generated successfully!");
     } catch (error: any) {
       console.error("AI Generation Error:", error);
@@ -183,10 +219,10 @@ export default function AILab() {
                     <p className="text-[10px] text-center py-8 text-muted-foreground font-bold uppercase tracking-widest">No history yet</p>
                   ) : (
                     history.map((item, i) => (
-                      <div key={i} className="p-3 rounded-xl bg-muted/30 border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setResult(item.result)}>
+                      <div key={item.id || i} className="p-3 rounded-xl bg-muted/30 border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setResult(item.result)}>
                         <div className="flex items-center justify-between mb-1">
                           <Badge variant="outline" className="text-[8px] font-bold uppercase">{item.type}</Badge>
-                          <span className="text-[8px] text-muted-foreground">{item.date.toLocaleTimeString()}</span>
+                          <span className="text-[8px] text-muted-foreground">{new Date(item.created_at).toLocaleTimeString()}</span>
                         </div>
                         <p className="text-[10px] font-medium line-clamp-1">{item.prompt}</p>
                       </div>
@@ -249,3 +285,4 @@ export default function AILab() {
     </div>
   );
 }
+

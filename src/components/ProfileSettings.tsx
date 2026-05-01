@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/src/lib/supabase";
@@ -58,65 +59,51 @@ const profileSchema = z.object({
 import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function ProfileSettings() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, roles, loading: authLoading, refreshProfile } = useAuth();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [profile, setProfile] = React.useState<any>(null);
+  const [uploading, setUploading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm({
     resolver: zodResolver(profileSchema),
   });
 
-  const fetchProfile = async (retries = 3) => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
+  const loadFormData = () => {
+    if (profile) {
       reset({
-        first_name: data.first_name || "",
-        last_name: data.last_name || "",
-        email: user.email || "",
-        phone: data.phone || "",
-        address_line_1: data.address_line_1 || "",
-        bio: data.bio || "",
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        email: user?.email || "",
+        phone: profile.phone || "",
+        address_line_1: profile.address_line_1 || "",
+        bio: profile.bio || "",
       });
-    } catch (error: any) {
-      if (error?.message?.includes("Lock") && retries > 0) {
-        setTimeout(() => fetchProfile(retries - 1), 500);
-        return;
-      }
-      console.error("Error fetching profile:", error);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   React.useEffect(() => {
-    if (!authLoading) {
-      fetchProfile();
+    if (!authLoading && profile) {
+      loadFormData();
     }
-  }, [user, authLoading]);
+  }, [profile, authLoading]);
 
   const onSubmit = async (data: any) => {
     if (!user) return;
     setSaving(true);
     try {
+      // Don't try to update email as it's managed by auth
+      const { email, ...updateData } = data;
+      
       const { error } = await supabase
         .from('profiles')
-        .update(data)
+        .update(updateData)
         .eq('id', user.id);
 
       if (error) throw error;
+      await refreshProfile();
       toast.success("Profile updated successfully!");
-      fetchProfile();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -188,12 +175,55 @@ export default function ProfileSettings() {
                     <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
                     <AvatarFallback className="text-4xl">{profile?.first_name?.[0]}</AvatarFallback>
                   </Avatar>
+                  <input 
+                    type="file" 
+                    id="avatar-upload" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !user) return;
+                      
+                      setUploading(true);
+                      try {
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+                        const filePath = `avatars/${fileName}`;
+
+                        const { error: uploadError } = await supabase.storage
+                          .from('profiles')
+                          .upload(filePath, file);
+
+                        if (uploadError) throw uploadError;
+
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('profiles')
+                          .getPublicUrl(filePath);
+
+                        const { error: updateError } = await supabase
+                          .from('profiles')
+                          .update({ avatar_url: publicUrl })
+                          .eq('id', user.id);
+
+                        if (updateError) throw updateError;
+                        
+                        await refreshProfile();
+                        toast.success("Avatar updated!");
+                      } catch (err: any) {
+                        toast.error(err.message);
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  />
                   <Button 
                     size="icon" 
                     variant="secondary" 
                     className="absolute bottom-2 right-2 rounded-full shadow-xl z-20 h-10 w-10 border-2 border-background"
+                    onClick={() => document.getElementById('avatar-upload')?.click()}
+                    disabled={uploading}
                   >
-                    <Camera className="w-5 h-5" />
+                    <Camera className={cn("w-5 h-5", uploading && "animate-spin")} />
                   </Button>
                 </div>
                 
@@ -202,23 +232,30 @@ export default function ProfileSettings() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Member since {profile?.created_at ? new Date(profile.created_at).getFullYear() : '2024'}</p>
                 </div>
 
-                <div className="w-full pt-4 border-t border-muted/50 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Role</span>
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[10px] font-bold uppercase">{profile?.role || 'Member'}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Verification</span>
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "border-none text-[10px] font-bold uppercase",
-                        profile?.approval_status === 'approved' ? "bg-emerald-500/10 text-emerald-600" : 
-                        profile?.approval_status === 'pending' ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {profile?.approval_status || 'Unverified'}
-                    </Badge>
+                  <div className="flex flex-col gap-2 pt-4 border-t border-muted/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Roles</span>
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {roles.length > 0 ? roles.map((r, i) => (
+                          <Badge key={i} variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">{r.replace(/_/g, ' ')}</Badge>
+                        )) : (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">Member</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Verification</span>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "border-none text-[10px] font-bold uppercase",
+                          profile?.approval_status === 'approved' ? "bg-emerald-500/10 text-emerald-600" : 
+                          profile?.approval_status === 'pending' ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {profile?.approval_status || 'Unverified'}
+                      </Badge>
+                    </div>
                   </div>
                   {profile?.department && (
                     <div className="flex items-center justify-between">

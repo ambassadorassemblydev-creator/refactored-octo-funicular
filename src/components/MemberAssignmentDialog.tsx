@@ -59,14 +59,16 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
         { data: mData },
         { data: pData },
         { data: urData },
-        { data: cwData }
+        { data: cwData },
+        { data: mmData }
       ] = await Promise.all([
         supabase.from('roles').select('id, name'),
         supabase.from('church_departments').select('id, name'),
         supabase.from('ministries').select('id, name'),
-        supabase.from('church_positions').select('id, title'),
-        supabase.from('user_roles').select('role_id').eq('user_id', member.id).maybeSingle(),
-        supabase.from('church_workers').select('department_id, position_id').eq('user_id', member.id).maybeSingle()
+        supabase.from('church_positions').select('id, title, department_id'),
+        supabase.from('user_roles').select('role_id').eq('user_id', member.id),
+        supabase.from('church_workers').select('department_id, position_id').eq('user_id', member.id).maybeSingle(),
+        supabase.from('ministry_members').select('ministry_id').eq('user_id', member.id).maybeSingle()
       ]);
 
       setRoles(rData || []);
@@ -74,16 +76,23 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
       setMinistries(mData || []);
       setPositions(pData || []);
 
-      if (urData) {
-        const role = rData?.find(r => r.id === urData.role_id);
-        if (role) setSelectedRole(role.name);
+      if (urData && urData.length > 0) {
+        // Priority: super_admin > admin > pastor > leader > worker > member
+        const roleRanking = ['super_admin', 'admin', 'pastor', 'leader', 'worker', 'member'];
+        const userRoleNames = urData.map(ur => rData?.find(r => r.id === ur.role_id)?.name).filter(Boolean);
+        
+        const bestRole = roleRanking.find(rn => userRoleNames.includes(rn));
+        if (bestRole) setSelectedRole(bestRole);
       }
       if (cwData) {
         setSelectedDept(cwData.department_id || "");
         setSelectedPosition(cwData.position_id || "");
       }
-      if (member?.ministry) {
-        setSelectedMinistry(member.ministry);
+      if (mmData) {
+        setSelectedMinistry(mmData.ministry_id || "");
+      } else if (member?.ministry) {
+        const fallbackMinistry = (mData || []).find(m => m.name === member.ministry);
+        if (fallbackMinistry) setSelectedMinistry(fallbackMinistry.id);
       }
     } catch (err) {
       console.error(err);
@@ -99,43 +108,80 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
   const handleSave = async () => {
     setLoading(true);
     try {
-      const updates = [];
-
-      // 1. Update Role
+      // 1. Handle Role Update (High IQ Upsert)
       if (selectedRole) {
-        const roleId = roles.find(r => r.name === selectedRole)?.id;
-        if (roleId) {
-          updates.push(supabase.from('user_roles').upsert({ 
-            user_id: member.id, 
-            role_id: roleId,
-            is_active: true
-          }, { onConflict: 'user_id' }));
+        const normalizedSelected = selectedRole.toLowerCase().replace(/\s+/g, '_');
+        const role = roles.find(r => r.name.toLowerCase().replace(/\s+/g, '_') === normalizedSelected);
+        
+        if (role) {
+          // Check if user already has this role to avoid redundant upsert if it already exists
+          const alreadyHas = urData?.some(ur => ur.role_id === role.id);
+          
+          if (!alreadyHas) {
+            const { error: roleErr } = await supabase.from('user_roles').upsert({ 
+              user_id: member.id, 
+              role_id: role.id,
+              is_active: true
+            }, { onConflict: 'user_id, role_id' });
+            if (roleErr) throw roleErr;
+          }
         }
       }
 
-      // 2. Update Department (Church Workers)
+      // 2. Handle Department/Position Update
       if (selectedDept && selectedDept !== 'none') {
-        updates.push((supabase.from('church_workers') as any).upsert({
-          user_id: member.id,
-          department_id: selectedDept,
-          position_id: selectedPosition || null,
-          status: 'active'
-        }, { onConflict: 'user_id' }));
+        const { data: existingWorker } = await supabase.from('church_workers').select('id').eq('user_id', member.id).maybeSingle();
+        if (existingWorker) {
+          const { error: workerErr } = await supabase.from('church_workers').update({
+            department_id: selectedDept,
+            position_id: selectedPosition || null,
+            status: 'active'
+          }).eq('id', existingWorker.id);
+          if (workerErr) throw workerErr;
+        } else {
+          const { error: workerErr } = await supabase.from('church_workers').insert({
+            user_id: member.id,
+            department_id: selectedDept,
+            position_id: selectedPosition || null,
+            status: 'active'
+          });
+          if (workerErr) throw workerErr;
+        }
+      } else if (selectedDept === 'none') {
+        await supabase.from('church_workers').delete().eq('user_id', member.id);
       }
 
-      // 3. Update Profile (Title + Ministry + Department field cache)
-      updates.push(supabase.from('profiles').update({ 
+      // 3. Handle Ministry Update
+      if (selectedMinistry && selectedMinistry !== 'none') {
+        const { data: existingMinMember } = await supabase.from('ministry_members').select('id').eq('user_id', member.id).maybeSingle();
+        if (existingMinMember) {
+          const { error: minErr } = await supabase.from('ministry_members').update({
+            ministry_id: selectedMinistry,
+            role: 'member'
+          }).eq('id', existingMinMember.id);
+          if (minErr) throw minErr;
+        } else {
+          const { error: minErr } = await supabase.from('ministry_members').insert({
+            user_id: member.id,
+            ministry_id: selectedMinistry,
+            role: 'member'
+          });
+          if (minErr) throw minErr;
+        }
+      } else if (selectedMinistry === 'none') {
+        await supabase.from('ministry_members').delete().eq('user_id', member.id);
+      }
+
+      // 4. Update Profile (Title + Ministry + Department field cache)
+      const deptName = departments.find(d => d.id === selectedDept)?.name || null;
+      const minName = ministries.find(m => m.id === selectedMinistry)?.name || null;
+      const { error: profileErr } = await supabase.from('profiles').update({ 
         title: selectedTitle as any,
-        ministry: (selectedMinistry !== 'none' ? selectedMinistry : null) as any,
-        department: (departments.find(d => d.id === selectedDept)?.name || null) as any
-      } as any).eq('id', member.id));
-
-      const saveResults = await Promise.all(updates);
-      const errors = saveResults.filter(r => r.error);
+        ministry: minName as any,
+        department: deptName as any
+      } as any).eq('id', member.id);
       
-      if (errors.length > 0) {
-        throw new Error(errors[0].error?.message || "Some updates failed");
-      }
+      if (profileErr) throw profileErr;
 
       // Audit Log
       await auditRepo.logAction({
@@ -150,7 +196,8 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.message);
+      console.error("Assignment Save Error:", err);
+      toast.error(err.message || "Failed to update assignments");
     } finally {
       setLoading(false);
     }
@@ -247,7 +294,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
                   <SelectValue placeholder="Select specific role" />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-xl">
-                  {positions.map(p => (
+                  {positions.filter(p => p.department_id === selectedDept).map(p => (
                     <SelectItem key={p.id} value={p.id} className="rounded-xl">
                       {p.title}
                     </SelectItem>
@@ -269,7 +316,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
               <SelectContent className="rounded-2xl border-none shadow-xl">
                 <SelectItem value="none" className="rounded-xl italic">No Assignment</SelectItem>
                 {ministries.map(m => (
-                  <SelectItem key={m.id} value={m.name} className="rounded-xl">
+                  <SelectItem key={m.id} value={m.id} className="rounded-xl">
                     {m.name}
                   </SelectItem>
                 ))}

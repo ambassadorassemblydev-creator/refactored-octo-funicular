@@ -12,7 +12,7 @@ import Sermons from "./components/Sermons";
 import AdminControls from "./components/AdminControls";
 import Ministries from "./components/Ministries";
 import Departments from "./components/Departments";
-import Giving from "./components/Giving";
+import Finance from "./components/Finance";
 import PrayerRequests from "./components/PrayerRequests";
 import Events from "./components/Events";
 import EventRegistrations from "./components/EventRegistrations";
@@ -34,7 +34,9 @@ import BlogPosts from "./components/BlogPosts";
 import DevoManager from "./components/DevoManager";
 import NewsletterManager from "./components/NewsletterManager";
 import ApprovalsCenter from "./components/ApprovalsCenter";
+import Broadcast from "./components/Broadcast";
 import { Toaster } from "sonner";
+
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Loader2, Shield } from "lucide-react";
@@ -134,6 +136,43 @@ function AppContent() {
     );
   }
 
+  // ==========================================
+  // RBAC GATEKEEPER (High IQ Security)
+  // ==========================================
+  const { role } = useAuth();
+  const isAuthorized = role && ['super_admin', 'admin', 'pastor', 'leader'].includes(role);
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
+        <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mb-8 ring-1 ring-red-500/20">
+          <Shield className="w-10 h-10 text-red-500" />
+        </div>
+        <h1 className="text-3xl font-black tracking-tighter text-white mb-2">Access Restricted</h1>
+        <p className="text-muted-foreground max-w-md mb-8">
+          This workstation is reserved for authorized Ambassadors Assembly personnel. 
+          Your current account does not have administrative privileges.
+        </p>
+        <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            className="rounded-xl border-white/10"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign Out
+          </Button>
+          <Button 
+            className="rounded-xl"
+            onClick={() => window.location.href = "https://theambassadorsassembly.org"}
+          >
+            Return to Main Site
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
@@ -141,7 +180,7 @@ function AppContent() {
       case "members":
         return <MembersList onTabChange={setActiveTab} />;
       case "sermons":
-        return <Sermons />;
+        return <Sermons onTabChange={setActiveTab} />;
       case "profile":
         return <ProfileSettings />;
       case "admin":
@@ -159,7 +198,7 @@ function AppContent() {
       case "departments":
         return <Departments onTabChange={setActiveTab} />;
       case "donations":
-        return <Giving />;
+        return <Finance />;
       case "prayers":
         return <PrayerRequests />;
       case "events":
@@ -185,7 +224,7 @@ function AppContent() {
       case "reports":
         return <Reports />;
       case "volunteers":
-        return <Volunteers />;
+        return <Volunteers onTabChange={setActiveTab} />;
       case "master-rota":
         return <MasterRota />;
       case "live-stream":
@@ -198,7 +237,10 @@ function AppContent() {
         return <DevoManager />;
       case "newsletter":
         return <NewsletterManager />;
+      case "broadcast":
+        return <Broadcast />;
       case "approvals":
+
         return <ApprovalsCenter />;
       default:
         return <Dashboard />;

@@ -58,7 +58,7 @@ export default function MediaGallery() {
   const [newCloudinaryId, setNewCloudinaryId] = React.useState("");
   const [savingCloudinary, setSavingCloudinary] = React.useState(false);
 
-  const CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || '';
+  const CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || 'dxwhpacz7';
   const getCloudinaryUrl = (item: any) => {
     if (item.cloudinary_public_id && CLOUD_NAME) {
       return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${item.cloudinary_public_id}`;

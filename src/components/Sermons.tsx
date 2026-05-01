@@ -49,7 +49,11 @@ import { auditRepo } from "@/src/lib/audit";
 
 import { useAuth } from "@/src/contexts/AuthContext";
 
-export default function Sermons() {
+interface SermonsProps {
+  onTabChange?: (tab: string) => void;
+}
+
+export default function Sermons({ onTabChange }: SermonsProps) {
   const { user, loading: authLoading } = useAuth();
   const [sermons, setSermons] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -198,7 +202,11 @@ export default function Sermons() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2 h-11 px-5">
+          <Button 
+            variant="outline" 
+            className="gap-2 h-11 px-5"
+            onClick={() => onTabChange?.('live-stream')}
+          >
             <Video className="w-4 h-4" />
             Live Stream
           </Button>

@@ -67,9 +67,7 @@ export default function DonationForm({ onSuccess, onCancel }: DonationFormProps)
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Cast to any to work around strict DB type — donation_type/payment_channel
-      // are new columns added via migration, not yet reflected in generated types
-      const payload: any = {
+      const payload = {
         amount: values.amount,
         currency: "NGN",
         donation_type: values.donation_type,

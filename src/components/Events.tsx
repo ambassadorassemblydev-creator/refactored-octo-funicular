@@ -65,7 +65,7 @@ export default function Events() {
     try {
       let query = supabase
         .from('events')
-        .select('*');
+        .select('*, event_registrations(count)');
 
       if (tab === "upcoming") {
         query = query.gte('start_date', new Date().toISOString()).order('start_date', { ascending: true });
@@ -103,7 +103,7 @@ export default function Events() {
     setRegsLoading(true);
     const { data } = await supabase
       .from('event_registrations')
-      .select('*, profiles:user_id(first_name, last_name, email, avatar_url)')
+      .select('*, profiles:user_id(first_name, last_name, email, avatar_url, role_claim, department_claim)')
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
     setRegistrations(data || []);
@@ -319,7 +319,7 @@ export default function Events() {
                           <Users className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex flex-col">
-                          <span>{event.current_attendees || 0} Registered</span>
+                          <span>{(event.event_registrations?.[0]?.count ?? event.current_attendees) || 0} Registered</span>
                           {event.max_attendees > 0 && (
                             <div className="w-24 h-1 bg-muted rounded-full mt-1 overflow-hidden">
                               <div 
@@ -334,7 +334,7 @@ export default function Events() {
                   </CardContent>
                   <CardFooter className="p-6 pt-0 border-t bg-muted/5 mt-auto">
                     <Button variant="ghost" className="w-full justify-between group/btn px-0 hover:bg-transparent" onClick={() => { setViewingRegistrations(event); fetchRegistrations(event.id); }}>
-                      <span className="text-xs font-bold uppercase tracking-widest">View Registrations ({event.current_attendees || 0})</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">View Registrations ({(event.event_registrations?.[0]?.count ?? event.current_attendees) || 0})</span>
                       <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
                     </Button>
                   </CardFooter>
@@ -434,6 +434,10 @@ export default function Events() {
                     {reg.profiles ? `${reg.profiles.first_name} ${reg.profiles.last_name}` : reg.guest_name || 'Guest'}
                   </p>
                   <p className="text-xs text-muted-foreground">{reg.profiles?.email || reg.guest_email}</p>
+                  <div className="flex gap-1 mt-1">
+                    {reg.profiles?.role_claim && <Badge className="text-[8px] h-3 px-1.5 bg-primary/5 text-primary border-none">{reg.profiles.role_claim}</Badge>}
+                    {reg.profiles?.department_claim && <Badge className="text-[8px] h-3 px-1.5 bg-purple-500/5 text-purple-600 border-none">{reg.profiles.department_claim}</Badge>}
+                  </div>
                 </div>
                 <div className="text-right space-y-1">
                   {reg.checked_in ? (

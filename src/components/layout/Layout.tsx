@@ -84,7 +84,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }: any) => 
 export default function Layout({ children, onTabChange, activeTab }: { children: React.ReactNode, onTabChange: (tab: string) => void, activeTab: string }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const { user, role } = useAuth();
+  const { user, role, roles, profile, loading: authLoading } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -106,6 +106,42 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     return () => clearTimeout(timer);
   }, [activeTab]);
 
+  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    setNotifications(data || []);
+    setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+  };
+
+  React.useEffect(() => {
+    if (!authLoading) {
+      fetchNotifications();
+      // Subscribe to new notifications
+      const sub = supabase
+        .channel('schema-db-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, () => {
+          fetchNotifications();
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(sub); };
+    }
+  }, [user, authLoading]);
+
+  const markAllRead = async () => {
+    if (!user) return;
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id);
+    fetchNotifications();
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -125,26 +161,35 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     { id: "contact-inbox", icon: Inbox, label: "Contact Inbox", category: "Engagement" },
     { id: "prayer-wall", icon: MessageSquare, label: "Prayer Wall", category: "Engagement" },
     { id: "milestones", icon: PartyPopper, label: "Milestones", category: "Engagement" },
-    { id: "newsletter", icon: Mail, label: "Newsletter", category: "Engagement" },
+    { id: "broadcast", icon: Zap, label: "Broadcast Message", category: "Engagement" },
     { id: "sermons", icon: BookOpen, label: "Sermons", category: "Resources" },
+
     { id: "blog-posts", icon: PenLine, label: "Blog Posts", category: "Resources" },
     { id: "devotionals", icon: Sun, label: "Devotionals", category: "Resources" },
     { id: "media", icon: ImageIcon, label: "Media Gallery", category: "Resources" },
     { id: "resources", icon: Library, label: "Resource Center", category: "Resources" },
     { id: "ai-lab", icon: Sparkles, label: "AI Content Lab", category: "Resources" },
     { id: "tasks", icon: ClipboardList, label: "Tasks", category: "Engagement" },
-    ...(role === 'admin' || role === 'pastor' || role === 'super_admin' ? [
-      { id: "donations", icon: Heart, label: "Giving", category: "Finance" },
-      { id: "giving-goals", icon: Target, label: "Giving Goals", category: "Finance" },
-      { id: "admin-settings", icon: Settings, label: "Settings", category: "System" },
-      { id: "admin-roles", icon: ShieldCheck, label: "Roles", category: "System" },
-      { id: "admin-system", icon: Server, label: "System Status", category: "System" },
-      { id: "admin-audit", icon: History, label: "Audit Logs", category: "System" },
-      { id: "reports", icon: FileText, label: "Reports", category: "System" },
-    ] : []),
+    { id: "donations", icon: Heart, label: "Finance", category: "Finance" },
+    { id: "giving-goals", icon: Target, label: "Giving Goals", category: "Finance" },
+    { id: "admin-settings", icon: Settings, label: "Settings", category: "System" },
+    { id: "admin-roles", icon: ShieldCheck, label: "Roles", category: "System" },
+    { id: "admin-system", icon: Server, label: "System Status", category: "System" },
+    { id: "admin-audit", icon: History, label: "Audit Logs", category: "System" },
+    { id: "reports", icon: FileText, label: "Reports", category: "System" },
   ];
 
-  const categories = Array.from(new Set(menuItems.map(item => item.category)));
+  const filteredMenuItems = menuItems.filter(item => {
+    if (["donations", "giving-goals", "reports", "admin-settings", "admin-roles", "admin-system", "admin-audit", "broadcast"].includes(item.id)) {
+      return role === 'admin' || role === 'super_admin' || role === 'pastor';
+    }
+    if (item.id === "approvals") {
+      return role === 'admin' || role === 'super_admin' || role === 'pastor' || role === 'leader';
+    }
+    return true;
+  });
+
+  const categories = Array.from(new Set(filteredMenuItems.map(item => item.category)));
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">
@@ -199,7 +244,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                   <Command.Empty className="p-8 text-center text-muted-foreground">No results found.</Command.Empty>
                   
                   <Command.Group heading="Navigation" className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {menuItems.map(item => (
+                    {filteredMenuItems.map(item => (
                       <Command.Item 
                         key={item.id}
                         onSelect={() => {
@@ -265,7 +310,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                     {category}
                   </h3>
                 )}
-                {menuItems.filter(item => item.category === category).map((item) => (
+                {filteredMenuItems.filter(item => item.category === category).map((item) => (
                   <SidebarItem
                     key={item.id}
                     icon={item.icon}
@@ -333,7 +378,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                       <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
                         {category}
                       </h3>
-                      {menuItems.filter(item => item.category === category).map((item) => (
+                      {filteredMenuItems.filter(item => item.category === category).map((item) => (
                         <SidebarItem
                           key={item.id}
                           icon={item.icon}
@@ -392,23 +437,31 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
             <DropdownMenu>
               <DropdownMenuTrigger className="relative inline-flex items-center justify-center h-10 w-10 rounded-full hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+                {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background" />}
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-80 p-0" align="end">
                 <div className="p-4 border-b flex items-center justify-between">
-                  <h4 className="font-bold text-sm">Notifications</h4>
-                  <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase tracking-wider">Mark all read</Button>
+                  <div className="space-y-0.5">
+                    <h4 className="font-bold text-sm">Notifications</h4>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">{unreadCount} Unread Alerts</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={markAllRead} className="h-7 text-[10px] uppercase tracking-wider">Mark all read</Button>
                 </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="p-4 border-b hover:bg-muted/50 transition-colors cursor-pointer flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <Zap className="w-4 h-4 text-primary" />
+                <div className="max-h-[350px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center space-y-2">
+                      <Zap className="w-8 h-8 text-muted-foreground/20 mx-auto" />
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No notifications</p>
+                    </div>
+                  ) : notifications.map(notif => (
+                    <div key={notif.id} className={cn("p-4 border-b hover:bg-muted/50 transition-colors cursor-pointer flex gap-3", !notif.is_read && "bg-primary/[0.03]")}>
+                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", notif.is_read ? "bg-muted" : "bg-primary/10")}>
+                        <Zap className={cn("w-4 h-4", notif.is_read ? "text-muted-foreground" : "text-primary")} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-medium">New Prayer Request</p>
-                        <p className="text-[10px] text-muted-foreground line-clamp-2">Sister Mary just posted a new prayer request for her family.</p>
-                        <p className="text-[9px] text-primary font-bold">2 MINS AGO</p>
+                        <p className="text-xs font-bold">{notif.title}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2">{notif.content || notif.message}</p>
+                        <p className="text-[9px] text-primary font-bold uppercase">{new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
                     </div>
                   ))}
@@ -420,17 +473,32 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
             </DropdownMenu>
             
             <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-12 w-12 rounded-2xl p-0 hover:bg-muted transition-all overflow-hidden border-2 border-transparent hover:border-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <DropdownMenuTrigger className="relative h-12 w-12 rounded-2xl p-0 hover:bg-muted transition-all overflow-hidden border-2 border-transparent hover:border-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-lg">
                 <Avatar className="h-full w-full rounded-none">
-                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} alt="User" />
-                  <AvatarFallback className="rounded-none">UA</AvatarFallback>
+                  <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} alt="User" />
+                  <AvatarFallback className="rounded-none bg-primary text-primary-foreground font-bold">
+                    {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64 p-2" align="end">
                 <DropdownMenuLabel className="font-normal p-2">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-bold leading-none">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Ambassador'}</p>
+                    <p className="text-sm font-bold leading-none">
+                      {profile ? `${profile.first_name} ${profile.last_name || ''}` : (user?.user_metadata?.full_name || 'Ambassador')}
+                    </p>
                     <p className="text-[10px] leading-none text-muted-foreground uppercase tracking-widest mt-1">{user?.email}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {roles.length > 0 ? roles.map((r, i) => (
+                        <span key={i} className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary w-fit">
+                          {r.replace(/_/g, ' ')}
+                        </span>
+                      )) : (
+                        <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary w-fit">
+                          Member
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

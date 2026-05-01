@@ -20,6 +20,8 @@ import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { auditRepo } from "@/src/lib/audit";
+import { notificationRepo } from "@/src/lib/notifications";
 
 type Settings = Record<string, string>;
 
@@ -53,13 +55,38 @@ function SettingRow({ label, description, settingKey, settings, onChange }: { la
 }
 
 export default function AdminControls({ defaultTab = "general" }: { defaultTab?: string }) {
-  const { loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [settings, setSettings] = React.useState<Settings>({});
   const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
   const [roles, setRoles] = React.useState<any[]>([]);
   const [activeTab, setActiveTab] = React.useState(defaultTab);
+
+  if (!authLoading && role !== 'admin' && role !== 'super_admin' && role !== 'pastor') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-500">
+        <div className="w-24 h-24 bg-rose-500/10 rounded-[2.5rem] flex items-center justify-center relative">
+          <div className="absolute inset-0 bg-rose-500/20 rounded-[2.5rem] blur-2xl animate-pulse" />
+          <Shield className="w-12 h-12 text-rose-500 relative z-10" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black tracking-tighter">System Restricted</h2>
+          <p className="text-muted-foreground max-w-sm mx-auto font-medium">
+            Administrative controls and system settings are strictly limited to 
+            Super Admins and Pastoral leadership.
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          className="rounded-xl border-primary/20 hover:bg-primary/5 text-primary font-bold uppercase tracking-widest text-[10px] h-11 px-8"
+          onClick={() => window.history.back()}
+        >
+          Return to Dashboard
+        </Button>
+      </div>
+    );
+  }
 
   // Announcement bar state
   const [bar, setBar] = React.useState<any>({
@@ -116,16 +143,45 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
 
   const saveSettings = async (keys: string[]) => {
     setSaving(true);
-    const updates = keys.map(key => supabase.from("church_settings").update({ value: settings[key] }).eq("key", key));
-    const results = await Promise.all(updates);
-    const errors = results.filter(r => r.error);
-    if (errors.length > 0) {
-      toast.error("Some settings failed to save. Check console.");
-      console.error(errors);
-    } else {
-      toast.success("Settings saved!");
+    try {
+      const updates = keys.map(key => 
+        supabase.from("church_settings").upsert({ 
+          key, 
+          value: settings[key],
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'key' })
+      );
+      
+      const results = await Promise.race([
+        Promise.all(updates),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Save timeout")), 10000))
+      ]) as any[];
+
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        toast.error("Some settings failed to save.");
+        console.error("Save errors:", errors.map(e => e.error));
+      } else {
+        toast.success("Settings updated successfully!");
+        // Log the action
+        await auditRepo.logAction({
+          admin_id: user?.id || 'unknown',
+          action: 'UPDATE',
+          table_name: 'church_settings',
+          record_id: keys.join(','),
+          new_values: settings
+        });
+
+        await notificationRepo.notifyAdmins(
+          "Settings Updated",
+          `${user?.user_metadata?.full_name || 'An admin'} updated church settings: ${keys.join(', ')}`
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const saveBar = async () => {
@@ -142,6 +198,19 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Announcement bar updated! Live on the website.");
+    
+    await auditRepo.logAction({
+      admin_id: user?.id || 'unknown',
+      action: barId ? 'UPDATE' : 'INSERT',
+      table_name: 'announcement_bar',
+      record_id: barId || 'new',
+      new_values: payload
+    });
+
+    await notificationRepo.notifyAdmins(
+      "Announcement Updated",
+      `${user?.user_metadata?.full_name || 'An admin'} updated the website announcement bar.`
+    );
   };
 
   const addTime = () => {

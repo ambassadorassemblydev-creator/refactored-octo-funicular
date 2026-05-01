@@ -165,7 +165,7 @@ export default function PrayerWall() {
             </Button>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-1 gap-4 md:gap-6">
             {filteredPrayers.map((prayer) => {
               const name = prayer.profiles ? `${prayer.profiles.first_name} ${prayer.profiles.last_name}` : "Member";
               return (
@@ -176,21 +176,21 @@ export default function PrayerWall() {
                   whileHover={{ y: -4 }}
                   className="bg-card/50 backdrop-blur-xl p-6 rounded-3xl shadow-xl border border-border/50 group transition-all"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border-2 border-primary/20">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <Avatar className="h-8 w-8 sm:h-10 sm:w-10 border-2 border-primary/20 shrink-0">
                         <AvatarImage src={prayer.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`} />
                         <AvatarFallback>{name[0]}</AvatarFallback>
                       </Avatar>
-                      <div>
-                        <h4 className="font-bold text-sm">{name}</h4>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                          <Clock className="w-3 h-3" />
-                          {new Date(prayer.created_at || '').toLocaleDateString()}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs sm:text-sm truncate">{name}</h4>
+                        <div className="flex items-center gap-1.5 text-[8px] sm:text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                          <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                          <span className="truncate">{new Date(prayer.created_at || '').toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase tracking-widest">
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[7px] sm:text-[8px] font-bold uppercase tracking-widest shrink-0">
                       {prayer.category}
                     </Badge>
                   </div>
@@ -199,31 +199,31 @@ export default function PrayerWall() {
                     "{prayer.description}"
                   </p>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-border/50 gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         className={cn(
-                          "rounded-xl gap-2 h-9 px-4 text-[10px] font-bold uppercase tracking-widest transition-all",
+                          "flex-1 sm:flex-none rounded-xl gap-1.5 sm:gap-2 h-8 sm:h-9 px-2 sm:px-4 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest transition-all",
                           prayedIds.has(prayer.id) ? "bg-primary text-primary-foreground" : "hover:bg-primary/10 hover:text-primary"
                         )}
                         onClick={() => togglePray(prayer.id)}
                       >
-                        <Heart className={cn("w-4 h-4", prayedIds.has(prayer.id) && "fill-current")} />
-                        {prayedIds.has(prayer.id) ? "Prayed" : "I'm Praying"}
+                        <Heart className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", prayedIds.has(prayer.id) && "fill-current")} />
+                        <span className="truncate">{prayedIds.has(prayer.id) ? "Prayed" : "I'm Praying"}</span>
                       </Button>
-                      <Button variant="ghost" size="sm" className="rounded-xl gap-2 h-9 px-4 text-[10px] font-bold uppercase tracking-widest hover:bg-muted/50">
-                        <MessageCircle className="w-4 h-4" />
-                        Encourage
+                      <Button variant="ghost" size="sm" className="flex-1 sm:flex-none rounded-xl gap-1.5 sm:gap-2 h-8 sm:h-9 px-2 sm:px-4 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest hover:bg-muted/50">
+                        <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="truncate">Encourage</span>
                       </Button>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                      <span className="text-[8px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                         {prayedIds.has(prayer.id) ? 1 : 0} Intercessors
                       </span>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                        <Share2 className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full">
+                        <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </div>
                   </div>

@@ -134,7 +134,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
         .from('church_workers')
         .select(`
           *,
-          profiles (
+          profiles:profiles!church_workers_user_id_fkey (
             id,
             first_name,
             last_name,

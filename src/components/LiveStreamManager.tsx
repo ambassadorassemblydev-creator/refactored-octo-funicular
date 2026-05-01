@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUpload } from "@/src/components/ui/ImageUpload";
 import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
 import { motion } from "motion/react";
@@ -20,6 +21,7 @@ interface StreamForm {
   stream_url: string;
   embed_url: string;
   platform: string;
+  thumbnail_url: string;
   scheduled_start: string;
   scheduled_end: string;
   is_featured: boolean;
@@ -45,6 +47,7 @@ export default function LiveStreamManager() {
     stream_url: "",
     embed_url: "",
     platform: "youtube",
+    thumbnail_url: "",
     scheduled_start: "",
     scheduled_end: "",
     is_featured: true,
@@ -56,9 +59,6 @@ export default function LiveStreamManager() {
     scripture_reference: "",
     scripture_text: "",
   });
-
-  const [isQuickLiveOpen, setIsQuickLiveOpen] = React.useState(false);
-  const [quickTitle, setQuickTitle] = React.useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -79,57 +79,50 @@ export default function LiveStreamManager() {
 
   React.useEffect(() => { fetchData(); }, []);
 
-  const openNew = () => {
+  const openNew = (status: string = "scheduled") => {
     setEditingStream(null);
-    setForm({ title: "", description: "", stream_url: "", embed_url: "", platform: "youtube", scheduled_start: "", scheduled_end: "", is_featured: true, chat_enabled: true, notify_subscribers: true, status: "scheduled", speaker_id: "", series_id: "", scripture_reference: "", scripture_text: "" });
+    setForm({ 
+      title: "", 
+      description: "", 
+      stream_url: "", 
+      embed_url: "", 
+      platform: "youtube", 
+      thumbnail_url: "",
+      scheduled_start: status === "live" ? new Date().toISOString().slice(0, 16) : "", 
+      scheduled_end: "", 
+      is_featured: true, 
+      chat_enabled: true, 
+      notify_subscribers: true, 
+      status: status, 
+      speaker_id: "", 
+      series_id: "", 
+      scripture_reference: "", 
+      scripture_text: "" 
+    });
     setIsFormOpen(true);
   };
 
-  const openEdit = (s: any) => {
+  const openEdit = (s: any, statusOverride?: string) => {
     setEditingStream(s);
     setForm({ 
       ...s, 
-      scheduled_start: s.scheduled_start ? new Date(s.scheduled_start).toISOString().slice(0, 16) : "", 
+      scheduled_start: s.scheduled_start ? new Date(s.scheduled_start).toISOString().slice(0, 16) : (statusOverride === "live" ? new Date().toISOString().slice(0, 16) : ""), 
       scheduled_end: s.scheduled_end ? new Date(s.scheduled_end).toISOString().slice(0, 16) : "",
       speaker_id: s.speaker_id || "",
       series_id: s.series_id || "",
       scripture_reference: s.scripture_reference || "",
-      scripture_text: s.scripture_text || ""
+      scripture_text: s.scripture_text || "",
+      thumbnail_url: s.thumbnail_url || "",
+      status: statusOverride || s.status
     });
     setIsFormOpen(true);
   };
 
   const handleGoLive = async (id: string) => {
-    const { error } = await supabase.from("live_streams").update({ status: "live", actual_start: new Date().toISOString() }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("🔴 You are now LIVE!", {
-      description: "The stream has been featured on the main watch page.",
-    });
-    fetchData();
-  };
-
-  const handleQuickGoLive = async () => {
-    if (!quickTitle) {
-      toast.error("Please enter a stream title");
-      return;
+    const stream = streams.find(s => s.id === id);
+    if (stream) {
+      openEdit(stream, "live");
     }
-
-    const { data, error } = await supabase.from("live_streams").insert({
-      title: quickTitle,
-      status: "live",
-      scheduled_start: new Date().toISOString(),
-      actual_start: new Date().toISOString(),
-      platform: "youtube",
-      is_featured: true
-    }).select().single();
-
-    if (error) { toast.error(error.message); return; }
-    toast.success("🔴 Quick stream started!", {
-      description: `Now live: ${quickTitle}`
-    });
-    setQuickTitle("");
-    setIsQuickLiveOpen(false);
-    fetchData();
   };
 
   const handleEndStream = async (id: string) => {
@@ -145,6 +138,7 @@ export default function LiveStreamManager() {
         description: stream.description,
         video_embed_url: stream.embed_url,
         video_url: stream.stream_url,
+        thumbnail_url: stream.thumbnail_url,
         sermon_date: stream.actual_start || stream.scheduled_start,
         speaker_id: stream.speaker_id || null,
         series_id: stream.series_id || null,
@@ -180,13 +174,14 @@ export default function LiveStreamManager() {
     const payload = { 
       ...form, 
       scheduled_start: new Date(form.scheduled_start).toISOString(), 
-      scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null 
+      scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
+      actual_start: form.status === "live" ? new Date().toISOString() : null
     };
     const { error } = editingStream
-      ? await supabase.from("live_streams").update(payload as any).eq("id", editingStream.id)
-      : await supabase.from("live_streams").insert(payload as any);
+      ? await supabase.from("live_streams").update(payload).eq("id", editingStream.id)
+      : await supabase.from("live_streams").insert(payload);
     if (error) { toast.error(error.message); return; }
-    toast.success(editingStream ? "Stream updated!" : "Stream scheduled!");
+    toast.success(editingStream ? "Stream updated!" : form.status === "live" ? "🔴 Broadcasting started!" : "Stream scheduled!");
     setIsFormOpen(false);
     fetchData();
   };
@@ -213,10 +208,11 @@ export default function LiveStreamManager() {
           <p className="text-muted-foreground">Schedule and manage church live streams. Go live directly from here.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => {
-            setQuickTitle("Live Service - " + new Date().toLocaleDateString());
-            setIsQuickLiveOpen(true);
-          }} className="gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10">
+          <Button 
+            variant="outline" 
+            onClick={() => openNew("live")} 
+            className="gap-2 h-11 rounded-xl border-red-500/20 text-red-500 hover:bg-red-500/10 shadow-lg shadow-red-500/10"
+          >
             <Radio className="w-4 h-4" /> Go Live Now
           </Button>
           <div className="flex items-center gap-2">
@@ -228,7 +224,7 @@ export default function LiveStreamManager() {
               <ExternalLink className="w-4 h-4" />
               View Watch Page
             </Button>
-            <Button onClick={openNew} className="gap-2 h-11 rounded-xl shadow-lg shadow-primary/20">
+            <Button onClick={() => openNew("scheduled")} className="gap-2 h-11 rounded-xl shadow-lg shadow-primary/20">
               <Plus className="w-4 h-4" /> Schedule Stream
             </Button>
           </div>
@@ -359,7 +355,7 @@ export default function LiveStreamManager() {
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto"><Radio className="w-10 h-10 text-muted-foreground" /></div>
           <h3 className="font-bold text-xl">No streams yet</h3>
           <p className="text-muted-foreground">Schedule your first live stream to get started.</p>
-          <Button onClick={openNew} className="gap-2 mt-4"><Plus className="w-4 h-4" /> Schedule Stream</Button>
+          <Button onClick={() => openNew("scheduled")} className="gap-2 mt-4"><Plus className="w-4 h-4" /> Schedule Stream</Button>
         </div>
       )}
 
@@ -367,14 +363,30 @@ export default function LiveStreamManager() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingStream ? "Edit Stream" : "Schedule New Stream"}</DialogTitle>
-            <DialogDescription>Configure the live stream details for Ambassadors Assembly.</DialogDescription>
+            <DialogTitle className={form.status === "live" ? "text-red-600 flex items-center gap-2" : ""}>
+              {form.status === "live" ? <><Radio className="w-5 h-5 animate-pulse" /> Go Live Instantly</> : editingStream ? "Edit Stream" : "Schedule New Stream"}
+            </DialogTitle>
+            <DialogDescription>
+              {form.status === "live" ? "This will create a new live stream entry and set it to active immediately." : "Configure the live stream details for Ambassadors Assembly."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label>Stream Title *</Label>
               <Input placeholder="Sunday Morning Service" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             </div>
+            
+            <div className="space-y-2">
+              <ImageUpload
+                label="Stream Thumbnail / Cover Image"
+                hint="Recommended: 16:9 ratio. This image will represent the stream on the watch page."
+                value={form.thumbnail_url}
+                onChange={url => setForm(f => ({ ...f, thumbnail_url: url }))}
+                folder="ambassadors_assembly/live_streams"
+                aspectRatio="video"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea placeholder="What is this service about?" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="resize-none" rows={2} />
@@ -453,42 +465,11 @@ export default function LiveStreamManager() {
             </div>
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-              <Button type="submit">{editingStream ? "Save Changes" : "Schedule Stream"}</Button>
+              <Button type="submit" className={form.status === "live" ? "bg-red-600 hover:bg-red-700 text-white" : ""}>
+                {form.status === "live" ? "Start Broadcasting Now" : editingStream ? "Save Changes" : "Schedule Stream"}
+              </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Quick Live Dialog */}
-      <Dialog open={isQuickLiveOpen} onOpenChange={setIsQuickLiveOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Radio className="w-5 h-5 animate-pulse" />
-              Go Live Instantly
-            </DialogTitle>
-            <DialogDescription>
-              This will create a new live stream entry and set it to active immediately.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="quick-title">Stream Title</Label>
-              <Input 
-                id="quick-title" 
-                placeholder="e.g. Sunday Morning Service" 
-                value={quickTitle} 
-                onChange={e => setQuickTitle(e.target.value)}
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setIsQuickLiveOpen(false)}>Cancel</Button>
-            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleQuickGoLive}>
-              Start Broadcasting
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

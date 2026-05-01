@@ -14,7 +14,9 @@ import {
   List,
   Eye,
   Share2,
-  Lock
+  Lock,
+  Loader2,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +27,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
-import { Loader2 } from "lucide-react";
+import { cn } from "@/src/lib/utils";
 
 type Resource = Database["public"]["Tables"]["resources"]["Row"];
 
@@ -34,8 +36,10 @@ export default function Resources() {
   const [view, setView] = React.useState<"grid" | "list">("grid");
   const [resources, setResources] = React.useState<Resource[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [uploading, setUploading] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("All Assets");
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchResources = async () => {
     setLoading(true);
@@ -59,6 +63,88 @@ export default function Resources() {
     fetchResources();
   }, []);
 
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('resources')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('resources')
+        .getPublicUrl(filePath);
+
+      const fileType = file.type.split('/')[0].toUpperCase();
+      const extension = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+
+      const { error: dbError } = await supabase
+        .from('resources')
+        .insert([{
+          name: file.name,
+          url: publicUrl,
+          type: extension,
+          category: extension === 'PDF' || extension === 'DOCX' ? 'Documents' : 
+                    extension === 'MP4' || extension === 'MOV' ? 'Videos' :
+                    extension === 'MP3' || extension === 'WAV' ? 'Audio' : 'Files',
+          file_size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          access_level: 'Public'
+        }]);
+
+      if (dbError) throw dbError;
+
+      toast.success("File uploaded successfully");
+      fetchResources();
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error(error.message || "Failed to upload file");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+      toast.success("Download started");
+    } catch (error) {
+      toast.error("Failed to download file");
+    }
+  };
+
+  const handleDelete = async (id: string, url: string) => {
+    if (!confirm("Delete this resource permanently?")) return;
+    
+    try {
+      const { error: dbError } = await supabase.from('resources').delete().eq('id', id);
+      if (dbError) throw dbError;
+      
+      // Attempt to delete from storage as well
+      const path = url.split('/resources/')[1];
+      if (path) {
+        await supabase.storage.from('resources').remove([path]);
+      }
+
+      toast.success("Resource deleted");
+      fetchResources();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const filteredResources = resources.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
                          r.category?.toLowerCase().includes(search.toLowerCase());
@@ -67,12 +153,11 @@ export default function Resources() {
   });
 
   const getIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'pdf': return FileText;
-      case 'video': return Video;
-      case 'audio': return Music;
-      default: return Folder;
-    }
+    const t = type.toLowerCase();
+    if (t === 'pdf' || t === 'docx' || t === 'doc') return FileText;
+    if (t === 'mp4' || t === 'mov') return Video;
+    if (t === 'mp3' || t === 'wav') return Music;
+    return Folder;
   };
 
   if (loading) {
@@ -96,12 +181,22 @@ export default function Resources() {
           <p className="text-muted-foreground font-medium">Access and manage digital assets, brand materials, and ministry resources.</p>
         </div>
         <div className="flex items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            onChange={handleUpload}
+          />
           <Button variant="outline" className="rounded-2xl h-12 px-4 gap-2 border-none bg-card/50 backdrop-blur-xl shadow-sm">
             <Folder className="w-4 h-4" />
             New Folder
           </Button>
-          <Button className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
-            <Plus className="w-4 h-4" />
+          <Button 
+            className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Upload File
           </Button>
         </div>
@@ -118,20 +213,20 @@ export default function Resources() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   <span>Used Space</span>
-                  <span>4.2 GB / 10 GB</span>
+                  <span>{resources.length * 0.5 > 1000 ? (resources.length * 0.5 / 1024).toFixed(1) + ' GB' : (resources.length * 0.5).toFixed(1) + ' MB'} / 10 GB</span>
                 </div>
                 <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-[42%]" />
+                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, (resources.length * 5) / 100)}%` }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-3 rounded-2xl bg-muted/30 text-center">
-                  <p className="text-lg font-black">1.2k</p>
+                  <p className="text-lg font-black">{resources.length}</p>
                   <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Files</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-muted/30 text-center">
-                  <p className="text-lg font-black">45</p>
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Folders</p>
+                  <p className="text-lg font-black">4</p>
+                  <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Categories</p>
                 </div>
               </div>
             </CardContent>
@@ -239,11 +334,11 @@ export default function Resources() {
                     view === "grid" ? "mt-6 pt-4 border-t border-border/50 justify-between" : "ml-4"
                   )}>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary" onClick={() => handleDownload(file.url, file.name)}>
                         <Download className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary">
-                        <Share2 className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(file.id, file.url)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                     <Badge variant="outline" className="bg-muted/50 border-none text-[8px] font-bold uppercase tracking-widest">
@@ -259,9 +354,3 @@ export default function Resources() {
     </div>
   );
 }
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ");
-}
-
-import { Clock } from "lucide-react";

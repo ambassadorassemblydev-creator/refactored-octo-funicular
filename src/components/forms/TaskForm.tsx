@@ -53,11 +53,6 @@ interface TaskFormProps {
 }
 
 export default function TaskForm({ initialData, workers, departments = [], onSubmit, onCancel, loading }: TaskFormProps) {
-  const [deptFilter, setDeptFilter] = React.useState(initialData?.department_id || "");
-  const filteredWorkers = deptFilter
-    ? workers.filter(w => w.department_id === deptFilter)
-    : workers;
-
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -71,6 +66,11 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
       category: initialData?.category || "General",
     },
   });
+
+  const selectedDeptId = form.watch("department_id");
+  const filteredWorkers = selectedDeptId
+    ? workers.filter(w => w.department_id === selectedDeptId)
+    : workers;
 
   return (
     <Form {...form}>
@@ -160,26 +160,35 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
+            name="department_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</FormLabel>
+                <Select onValueChange={(v) => { field.onChange(v); form.setValue("assignee", ""); }} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="all_depts">All Departments</SelectItem>
+                    {departments.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="assignee"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Assignee</FormLabel>
-                {departments.length > 0 && (
-                  <div className="mb-2">
-                    <Select value={deptFilter} onValueChange={v => { setDeptFilter(v ?? ''); form.setValue('assignee', ''); }}>
-                      <SelectTrigger className="rounded-xl h-9 bg-muted/20 border-none text-xs">
-                        <SelectValue placeholder="Filter by dept..." />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="">All Departments</SelectItem>
-                        {departments.map((d: any) => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} key={selectedDeptId}>
                   <FormControl>
                     <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
                       <SelectValue placeholder="Select worker" />
@@ -187,15 +196,30 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
                   </FormControl>
                   <SelectContent className="rounded-xl">
                     {filteredWorkers.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">No workers in this department</div>
+                      <div className="px-3 py-2 text-xs text-muted-foreground text-center">No workers found</div>
                     ) : filteredWorkers.map((worker) => (
                       <SelectItem key={worker.id} value={worker.user_id}>
                         {worker.profiles?.first_name} {worker.profiles?.last_name}
-                        {worker.church_departments?.name && ` · ${worker.church_departments.name}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Category</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. Operations" className="rounded-xl h-11 bg-muted/30 border-none" {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -252,3 +276,4 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
     </Form>
   );
 }
+

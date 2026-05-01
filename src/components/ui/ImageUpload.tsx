@@ -14,8 +14,8 @@ interface ImageUploadProps {
   aspectRatio?: "square" | "video" | "wide" | "free";
 }
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || 'dxwhpacz7';
+const UPLOAD_PRESET = (import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET || 'ml_default';
 
 export function ImageUpload({
   value,
@@ -79,9 +79,13 @@ export function ImageUpload({
 
         xhr.onload = () => {
           if (xhr.status === 200) {
-            resolve(JSON.parse(xhr.responseText));
+            const response = JSON.parse(xhr.responseText);
+            console.log("Cloudinary Upload Success:", response);
+            resolve(response);
           } else {
-            reject(new Error(`Upload failed: ${xhr.statusText}`));
+            const error = JSON.parse(xhr.responseText);
+            console.error("Cloudinary Upload Error:", error);
+            reject(new Error(`Upload failed: ${error.error?.message || xhr.statusText}`));
           }
         };
 

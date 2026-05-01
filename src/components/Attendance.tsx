@@ -77,9 +77,14 @@ export default function Attendance() {
         .limit(20);
 
       if (error) throw error;
-      setEvents(data || []);
-      if (data && data.length > 0) {
-        setSelectedEvent(data[0].id);
+      const standardServices = [
+        { id: 'sunday_service', title: 'Sunday Service', start_date: new Date().toISOString() },
+        { id: 'midweek_service', title: 'Midweek Service', start_date: new Date().toISOString() }
+      ];
+      const combinedEvents = [...standardServices, ...(data || [])];
+      setEvents(combinedEvents);
+      if (combinedEvents.length > 0) {
+        setSelectedEvent(combinedEvents[0].id);
       } else {
         setLoading(false);
       }
@@ -142,12 +147,15 @@ export default function Attendance() {
       const event = events.find(e => e.id === eventId);
       if (!event) return;
 
+      const serviceDate = event.start_date.split('T')[0];
+      const serviceName = event.title;
+
       // Fetch existing attendance for this event
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance_records')
         .select('user_id, attendance')
-        .eq('service_date', event.start_date.split('T')[0])
-        .eq('service_name', event.title);
+        .eq('service_date', serviceDate)
+        .eq('service_name', serviceName);
 
       if (attendanceError) throw attendanceError;
 
@@ -191,7 +199,7 @@ export default function Attendance() {
         user_id: memberId,
         service_date: serviceDate,
         service_name: serviceName,
-        attendance: (status === 'present' ? 'in_person' : status) as 'in_person' | 'online' | 'absent',
+        attendance: status as 'in_person' | 'online' | 'absent' | 'excused',
         checked_in_by: userResponse.data.user?.id,
         checked_in_at: new Date().toISOString()
       }));
@@ -249,10 +257,10 @@ export default function Attendance() {
   const markAllPresent = () => {
     const newAttendance = { ...attendance };
     members.forEach(m => {
-      newAttendance[m.id] = 'present';
+      newAttendance[m.id] = 'in_person';
     });
     setAttendance(newAttendance);
-    toast.success("Marked all as present");
+    toast.success("Marked all as present (In-Person)");
   };
 
   const notifyAbsentees = async () => {
@@ -270,7 +278,8 @@ export default function Attendance() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch('/api/admin/attendance/notify', {
+      const baseUrl = import.meta.env.VITE_MAIN_APP_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/api/admin/attendance/notify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,7 +302,7 @@ export default function Attendance() {
 
   const downloadQRCode = async () => {
     try {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent("https://ambassadors-assembly-web.onrender.com/my-account/attendance/mark")}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent("https://theambassadorsassembly.org/my-account/attendance/mark")}`;
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -317,7 +326,7 @@ export default function Attendance() {
   );
 
   const stats = {
-    present: Object.values(attendance).filter(v => v === 'present').length,
+    present: Object.values(attendance).filter(v => v === 'in_person' || v === 'online').length,
     absent: Object.values(attendance).filter(v => v === 'absent').length,
     excused: Object.values(attendance).filter(v => v === 'excused').length,
     total: members.length
@@ -412,7 +421,7 @@ export default function Attendance() {
         <CardContent className="p-8 flex flex-col md:flex-row items-center gap-12">
           <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl shadow-primary/10 border-4 border-primary/5 relative group">
             <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent("https://ambassadors-assembly-web.onrender.com/my-account/attendance/mark")}`} 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent("https://theambassadorsassembly.org/my-account/attendance/mark")}`} 
               alt="Entrance QR Code" 
               className="w-[200px] h-[200px] sm:w-[250px] sm:h-[250px]"
             />
@@ -438,7 +447,7 @@ export default function Attendance() {
             </div>
             <div className="p-4 bg-muted/50 rounded-2xl border border-dashed">
               <p className="text-xs font-medium text-muted-foreground mb-1">Target Gateway:</p>
-              <code className="text-[10px] break-all text-primary font-mono">https://ambassadors-assembly-web.onrender.com/my-account/attendance/mark</code>
+              <code className="text-[10px] break-all text-primary font-mono">https://theambassadorsassembly.org/my-account/attendance/mark</code>
             </div>
           </div>
         </CardContent>
@@ -547,10 +556,10 @@ export default function Attendance() {
                       </div>
                       <div className="flex items-center gap-2 w-full xs:w-auto justify-end">
                         <Button
-                          variant={status === 'present' ? 'default' : 'outline'}
+                          variant={status === 'in_person' ? 'default' : 'outline'}
                           size="sm"
-                          className={cn("flex-1 xs:flex-none h-8 rounded-full px-4 text-xs font-bold", status === 'present' && "bg-emerald-500 hover:bg-emerald-600")}
-                          onClick={() => handleStatusChange(member.id, 'present')}
+                          className={cn("flex-1 xs:flex-none h-8 rounded-full px-4 text-xs font-bold", status === 'in_person' && "bg-emerald-500 hover:bg-emerald-600")}
+                          onClick={() => handleStatusChange(member.id, 'in_person')}
                         >
                           Present
                         </Button>

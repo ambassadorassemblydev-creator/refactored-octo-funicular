@@ -45,6 +45,72 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { auditRepo } from "@/src/lib/audit";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { notificationRepo } from "@/src/lib/notifications";
+
+function ApprovalCard({ title, subtitle, meta, avatar, children, onApprove, onReject, score }: any) {
+  return (
+    <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm rounded-3xl overflow-hidden hover:shadow-xl transition-all duration-300">
+      <div className="p-6 flex flex-col md:flex-row md:items-center gap-6">
+        <Avatar className="h-14 w-14 rounded-2xl shadow-lg shadow-primary/10 border-2 border-background">
+          <AvatarImage src={avatar} />
+          <AvatarFallback className="bg-primary/10 text-primary font-black text-xl">{title ? title[0] : '?'}</AvatarFallback>
+        </Avatar>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="text-lg font-black tracking-tight truncate">{title}</h3>
+            <Badge variant="outline" className="bg-primary/5 text-primary border-none text-[8px] font-bold uppercase tracking-widest">{meta}</Badge>
+            {score !== undefined && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-[8px] font-bold uppercase tracking-widest border-none",
+                  score < 0.5 ? "bg-red-500/10 text-red-500" : (score < 0.8 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")
+                )}
+              >
+                {score < 0.5 ? "Spam Risk: High" : (score < 0.8 ? "Spam Risk: Med" : "Security: High")}
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">{subtitle}</p>
+          {children}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <Button 
+            onClick={onReject} 
+            variant="outline" 
+            className="h-11 rounded-xl border-none bg-rose-500/5 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 text-[10px] font-black uppercase tracking-widest px-6"
+          >
+            <XCircle className="w-4 h-4 mr-2" />
+            Reject
+          </Button>
+          <Button 
+            onClick={onApprove} 
+            className="h-11 rounded-xl shadow-lg shadow-primary/20 text-[10px] font-black uppercase tracking-widest px-6"
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Approve
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function EmptyState({ icon: Icon, title }: { icon: any, title: string }) {
+  return (
+    <div className="py-24 text-center space-y-4 bg-muted/10 rounded-[2rem] border-2 border-dashed border-muted">
+      <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto">
+        <Icon className="w-10 h-10 text-muted-foreground/30" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="font-bold text-xl text-muted-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground/60">Check back later for new items to review.</p>
+      </div>
+    </div>
+  );
+}
 
 export default function ApprovalsCenter() {
   const { user } = useAuth();
@@ -63,54 +129,33 @@ export default function ApprovalsCenter() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Staff Verifications (already_serving=true and approval_status=pending)
-      const { data: staff } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('already_serving', true)
-        .eq('approval_status', 'pending');
-
-      // 2. Fetch Volunteer Applications
-      const { data: volunteers } = await supabase
-        .from('volunteer_applications')
-        .select('*, church_departments(name), church_positions(title)')
-        .eq('status', 'pending');
-
-      // 3. Fetch Ministry Joins (pending members not yet active)
-      const { data: ministries } = await supabase
-        .from('ministry_members')
-        .select('*, ministries(name), profiles:user_id(first_name, last_name, email, avatar_url)')
-        .eq('role', 'pending');
-
-      // 4. Fetch Testimonies
-      const { data: testimonies } = await supabase
-        .from('testimonies')
-        .select('*')
-        .eq('status', 'pending' as any);
-
-      // 5. Fetch Prayer Requests pending approval
-      const { data: prayers } = await supabase
-        .from('prayer_requests')
-        .select('id, title, description, requester_name, requester_email, created_at, is_urgent, category')
-        .eq('is_approved', false)
-        .is('approved_at', null);
-
-      // 6. Fetch Roles and Departments for staff assignment
-      const [ { data: rData }, { data: dData } ] = await Promise.all([
+      const [
+        { data: staff },
+        { data: volunteers },
+        { data: ministries },
+        { data: testimonies },
+        { data: prayers },
+        { data: rData },
+        { data: dData }
+      ] = await Promise.all([
+        supabase.from('profiles').select('*').eq('already_serving', true).eq('approval_status', 'pending'),
+        supabase.from('volunteer_applications').select('*, church_departments(name), church_positions(title)').eq('status', 'pending'),
+        supabase.from('ministry_members').select('*, ministries(name), profiles:user_id(first_name, last_name, email, avatar_url)').eq('role', 'pending'),
+        supabase.from('testimonies').select('*').eq('status', 'pending' as any),
+        supabase.from('prayer_requests').select('id, title, description, requester_name, requester_email, created_at, is_urgent, category, recaptcha_score, is_public').eq('is_approved', false).is('approved_at', null),
         supabase.from('roles').select('id, name'),
         supabase.from('church_departments').select('id, name')
       ]);
 
-      setRoles(rData || []);
-      setDepartments(dData || []);
-
       setData({
-        staff: (staff || []).map(s => ({ ...s, _selectedRole: s.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(s.role_claim as string) ? 'pastor' : (s.role_claim && ['Elder','Deacon','Deaconess','Minister'].includes(s.role_claim as string) ? 'leader' : 'worker') })),
+        staff: staff || [],
         volunteers: volunteers || [],
         ministries: ministries || [],
         testimonies: testimonies || [],
         prayers: prayers || []
       });
+      setRoles(rData || []);
+      setDepartments(dData || []);
     } catch (error: any) {
       toast.error("Failed to load approval items");
     } finally {
@@ -141,89 +186,54 @@ export default function ApprovalsCenter() {
           updateData = { status: action === 'approve' ? 'active' : 'rejected', role: action === 'approve' ? 'member' : 'rejected' };
           break;
         case 'testimonies':
+          table = 'testimonies';
+          updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
+          break;
         case 'prayers':
-          table = type;
+          table = 'prayer_requests';
           updateData = { 
-            status: action === 'approve' ? 'approved' : 'rejected',
-            is_approved: action === 'approve'
+            is_approved: action === 'approve',
+            approved_at: action === 'approve' ? new Date().toISOString() : null
           };
           break;
       }
 
-      if (type === 'staff') {
-        const { error } = await supabase.from('profiles').update(updateData).eq('id', id);
-        if (error) throw error;
-      } else if (type === 'volunteers') {
-        const { error } = await supabase.from('volunteer_applications').update(updateData).eq('id', id);
-        if (error) throw error;
-      } else if (type === 'ministries') {
-        const { error } = await supabase.from('ministry_members').update({ 
-          role: action === 'approve' ? 'member' : 'rejected',
-          is_active: action === 'approve'
-        }).eq('id', id);
-        if (error) throw error;
-      } else if (type === 'testimonies') {
-        const { error } = await supabase.from('testimonies').update(updateData).eq('id', id);
-        if (error) throw error;
-      } else if (type === 'prayers') {
-        const { error } = await supabase.from('prayer_requests').update({ is_approved: action === 'approve', approved_at: new Date().toISOString() }).eq('id', id);
-        if (error) throw error;
-      }
+      const { error: updateError } = await supabase.from(table as any).update(updateData).eq('id', id);
+      if (updateError) throw updateError;
 
-      if (type === 'staff' && action === 'approve') {
-        const targetRole = record._selectedRole || 'worker';
-        const roleId = roles.find(r => r.name === targetRole)?.id;
-        
-        if (roleId) {
-          // 1. Assign System Role
-          await supabase.from('user_roles').upsert({ 
-            user_id: id, 
-            role_id: roleId,
-            is_active: true
-          }, { onConflict: 'user_id' });
-        }
-
-        // 2. Handle Department Claim
-        if (record.department_claim) {
-          const matchedDept = departments.find(d => 
-            d.name.toLowerCase().includes(record.department_claim.toLowerCase()) ||
-            record.department_claim.toLowerCase().includes(d.name.toLowerCase())
-          );
+      if ((type === 'staff' || type === 'volunteers') && action === 'approve') {
+        if (type === 'staff') {
+          const targetRole = record._selectedRole || 'worker';
+          const roleId = roles.find(r => r.name === targetRole)?.id;
           
-          if (matchedDept) {
-            await (supabase.from('church_workers') as any).upsert({
-              user_id: id,
-              department_id: matchedDept.id,
-              status: 'active'
+          if (roleId) {
+            await supabase.from('user_roles').upsert({ 
+              user_id: id, 
+              role_id: roleId,
+              is_active: true
             }, { onConflict: 'user_id' });
-            
-            // Cache in profile
-            updateData.department = matchedDept.name;
           }
-        }
 
-        // 3. Set Title if claiming pastoral role
-        if (record.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(record.role_claim)) {
-          updateData.title = record.role_claim;
-        }
-
-        updateData.is_member = true;
-        updateData.approved_by = user?.id;
-        updateData.approved_at = new Date().toISOString();
-
-        await supabase.from('profiles').update(updateData).eq('id', id);
-
-      } else if (type === 'volunteers' && action === 'approve') {
-        // Update profile cache for department
-        const deptName = record.church_departments?.name;
-        if (deptName) {
-          await supabase.from('profiles').update({ department: deptName } as any).eq('id', record.user_id);
-        }
-      } else if (type === 'ministries' && action === 'approve') {
-        // Update profile cache for ministry
-        const minName = record.ministries?.name;
-        if (minName) {
-          await supabase.from('profiles').update({ ministry: minName } as any).eq('id', record.user_id);
+          if (record.department_claim) {
+            const matchedDept = departments.find(d => 
+              d.name.toLowerCase().includes(record.department_claim.toLowerCase()) ||
+              record.department_claim.toLowerCase().includes(d.name.toLowerCase())
+            );
+            
+            if (matchedDept) {
+              await (supabase.from('church_workers') as any).upsert({
+                user_id: id,
+                department_id: matchedDept.id,
+                status: 'active'
+              }, { onConflict: 'user_id' });
+            }
+          }
+        } else if (type === 'volunteers') {
+          // Promote worker status from probation to active
+          await supabase.from('church_workers')
+            .update({ status: 'active' })
+            .eq('user_id', record.user_id)
+            .eq('department_id', record.department_id);
         }
       }
 
@@ -234,6 +244,11 @@ export default function ApprovalsCenter() {
         record_id: id,
         new_values: updateData
       });
+
+      await notificationRepo.notifyAdmins(
+        `Approval Action: ${type}`,
+        `${user?.user_metadata?.full_name || 'An admin'} ${action}ed a ${type} request.`
+      );
 
       toast.success(`Item ${action}ed successfully`);
       fetchData();
@@ -260,10 +275,10 @@ export default function ApprovalsCenter() {
       </div>
 
       <Tabs defaultValue="staff" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="bg-muted/50 p-1 rounded-2xl h-14 w-full justify-start overflow-x-auto no-scrollbar mb-8">
+        <TabsList className="bg-muted/50 p-1 rounded-2xl h-14 w-full justify-start overflow-x-auto no-scrollbar mb-8 gap-1">
           {[
             { id: "staff", label: "Staff Verifications", icon: Shield },
-            { id: "volunteers", label: "Service Applicants", icon: Users },
+            { id: "volunteers", label: "Outreach & Projects", icon: Users },
             { id: "ministries", label: "Ministry Joins", icon: HeartHandshake },
             { id: "testimonies", label: "Testimonies", icon: MessageSquare },
             { id: "prayers", label: "Prayer Requests", icon: MessageSquare },
@@ -393,6 +408,7 @@ export default function ApprovalsCenter() {
                       title={item.title}
                       subtitle={`By ${item.author_name} ${item.is_anonymous ? '(Anonymous)' : ''}`}
                       meta={new Date(item.created_at).toLocaleDateString()}
+                      score={item.recaptcha_score}
                       onApprove={() => handleAction('testimonies', item.id, 'approve', item)}
                       onReject={() => handleAction('testimonies', item.id, 'reject', item)}
                     >
@@ -412,6 +428,7 @@ export default function ApprovalsCenter() {
                       title={item.title || item.category}
                       subtitle={`Request from ${item.requester_name}`}
                       meta={item.category}
+                      score={item.recaptcha_score}
                       onApprove={() => handleAction('prayers', item.id, 'approve', item)}
                       onReject={() => handleAction('prayers', item.id, 'reject', item)}
                     >
@@ -427,60 +444,6 @@ export default function ApprovalsCenter() {
           </>
         )}
       </Tabs>
-    </div>
-  );
-}
-
-function ApprovalCard({ title, subtitle, meta, avatar, children, onApprove, onReject }: any) {
-  return (
-    <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm rounded-3xl overflow-hidden hover:shadow-xl transition-all duration-300">
-      <div className="p-6 flex flex-col md:flex-row md:items-center gap-6">
-        <Avatar className="h-14 w-14 rounded-2xl shadow-lg shadow-primary/10 border-2 border-background">
-          <AvatarImage src={avatar} />
-          <AvatarFallback className="bg-primary/10 text-primary font-black text-xl">{title[0]}</AvatarFallback>
-        </Avatar>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="text-lg font-black tracking-tight truncate">{title}</h3>
-            <Badge variant="outline" className="bg-primary/5 text-primary border-none text-[8px] font-bold uppercase tracking-widest">{meta}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground font-medium">{subtitle}</p>
-          {children}
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <Button 
-            onClick={onReject} 
-            variant="outline" 
-            className="h-11 rounded-xl border-none bg-rose-500/5 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 text-[10px] font-black uppercase tracking-widest px-6"
-          >
-            <XCircle className="w-4 h-4 mr-2" />
-            Reject
-          </Button>
-          <Button 
-            onClick={onApprove} 
-            className="h-11 rounded-xl shadow-lg shadow-primary/20 text-[10px] font-black uppercase tracking-widest px-6"
-          >
-            <CheckCircle2 className="w-4 h-4 mr-2" />
-            Approve
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function EmptyState({ icon: Icon, title }: { icon: any, title: string }) {
-  return (
-    <div className="py-24 text-center space-y-4 bg-muted/10 rounded-[2rem] border-2 border-dashed border-muted">
-      <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto">
-        <Icon className="w-10 h-10 text-muted-foreground/30" />
-      </div>
-      <div className="space-y-1">
-        <h3 className="font-bold text-xl text-muted-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground/60">Check back later for new items to review.</p>
-      </div>
     </div>
   );
 }

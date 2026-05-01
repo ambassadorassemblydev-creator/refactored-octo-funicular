@@ -21,7 +21,7 @@ export default function EventRegistrations() {
   const fetchEvents = async () => {
     const { data } = await supabase
       .from("events")
-      .select("id, title, start_date, current_attendees, max_attendees")
+      .select("id, title, start_date, max_attendees, registrations:event_registrations(count)")
       .order("start_date", { ascending: false });
     setEvents(data || []);
   };
@@ -158,7 +158,7 @@ export default function EventRegistrations() {
             <SelectItem value="all">All Events</SelectItem>
             {events.map(e => (
               <SelectItem key={e.id} value={e.id}>
-                {e.title} ({e.current_attendees || 0} registered)
+                {e.title} ({e.registrations?.[0]?.count || 0} registered)
               </SelectItem>
             ))}
           </SelectContent>

@@ -65,6 +65,7 @@ import { motion, AnimatePresence } from "motion/react";
 import MemberForm from "./forms/MemberForm";
 import { auditRepo } from "@/src/lib/audit";
 import MemberAssignmentDialog from "./MemberAssignmentDialog";
+import MemberView from "./MemberView";
 import { cn } from "@/src/lib/utils";
 
 import { useAuth } from "@/src/contexts/AuthContext";
@@ -90,10 +91,12 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
   const [pendingApprovals, setPendingApprovals] = React.useState<any[]>([]);
   const [approvingId, setApprovingId] = React.useState<string | null>(null);
   const [assigningMember, setAssigningMember] = React.useState<any>(null);
+  const [viewMode, setViewMode] = React.useState<'list' | 'detail'>('list');
 
   const { role } = useAuth();
   const canViewNotes = role === 'pastor' || role === 'super_admin';
   const canApprove = role === 'super_admin' || role === 'admin' || role === 'pastor';
+  const canViewDetails = role === 'super_admin' || role === 'admin' || role === 'pastor';
 
   const fetchPendingApprovals = async () => {
     const { data } = await supabase
@@ -368,6 +371,20 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
     return Math.round((filled / fields.length) * 100);
   };
 
+  if (viewMode === 'detail' && viewingMember) {
+    return (
+      <MemberView 
+        member={viewingMember} 
+        onBack={() => {
+          setViewMode('list');
+          setViewingMember(null);
+        }}
+        canViewFinancials={canViewDetails}
+        canViewNotes={canViewNotes}
+      />
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -532,7 +549,7 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
       </div>
     </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-4">
         <AnimatePresence mode="popLayout">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => (
@@ -560,7 +577,7 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                   transition={{ delay: i * 0.05 }}
                 >
                   <Card className="group border-none shadow-md bg-card/50 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden">
-                    <CardContent className="p-3 sm:p-6">
+                    <CardContent className="p-2 sm:p-6">
                       <div className="flex items-start gap-2 sm:gap-4">
                         <div className="flex items-center pt-7">
                           <input 
@@ -571,15 +588,15 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                           />
                         </div>
                         <div className="relative shrink-0">
-                          <Avatar className="h-12 w-12 sm:h-20 sm:w-20 border-2 sm:border-4 border-background shadow-lg group-hover:scale-105 transition-transform">
+                          <Avatar className="h-10 w-10 sm:h-20 sm:w-20 border-2 sm:border-4 border-background shadow-lg group-hover:scale-105 transition-transform">
                             <AvatarImage src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`} />
-                            <AvatarFallback className="text-xs sm:text-base">{member.first_name?.[0]}{member.last_name?.[0]}</AvatarFallback>
+                            <AvatarFallback className="text-[10px] sm:text-base">{member.first_name?.[0]}{member.last_name?.[0]}</AvatarFallback>
                           </Avatar>
                           <div className={cn(
-                            "absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-background flex items-center justify-center shadow-sm",
+                            "absolute -bottom-0.5 -right-0.5 w-4 h-4 sm:w-6 sm:h-6 rounded-full border border-background flex items-center justify-center shadow-sm",
                             member.status === 'active' ? "bg-emerald-500" : "bg-amber-500"
                           )}>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                            <CheckCircle2 className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" />
                           </div>
                         </div>
                         
@@ -588,9 +605,12 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                             <button 
                               onClick={() => {
                                 setViewingMember(member);
+                                if (canViewDetails) {
+                                  setViewMode('detail');
+                                }
                                 fetchNotes(member.id);
                               }}
-                              className="font-bold text-sm sm:text-lg truncate hover:text-primary hover:underline transition-colors text-left"
+                              className="font-bold text-[11px] sm:text-lg truncate hover:text-primary hover:underline transition-colors text-left"
                             >
                               {member.first_name} {member.last_name}
                             </button>
@@ -607,6 +627,12 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                                 <DropdownMenuItem onClick={() => setAssigningMember(member)}>
                                   <ShieldCheck className="w-4 h-4 mr-2" /> Manage Assignments
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setViewingMember(member);
+                                  setViewMode('detail');
+                                }}>
+                                  <ExternalLink className="w-4 h-4 mr-2" /> View Full Profile
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => onTabChange?.("attendance")}>
                                   <Calendar className="w-4 h-4 mr-2" /> View Attendance
                                 </DropdownMenuItem>
@@ -619,26 +645,36 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
                           </div>
                           
                           <div className="flex flex-col sm:flex-row flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1.5">
-                              <Mail className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                              <span className="truncate max-w-[80px] sm:max-w-none">{member.email}</span>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Mail className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+                              <span className="truncate">{member.email}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                              <span>{member.phone || 'No phone'}</span>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Phone className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+                              <span className="truncate">{member.phone || 'N/A'}</span>
                             </div>
                           </div>
 
-                          <div className="pt-3 flex items-center justify-between">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
-                              <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
-                                {member.member_id || 'MEMBER'}
-                              </Badge>
-                              <Badge variant="outline" className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
-                                {member.status}
-                              </Badge>
-                            </div>
-                            <div className="hidden sm:flex items-center gap-2">
+                            <div className="pt-3 flex items-center justify-between">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
+                                  {member.member_id || 'MEMBER'}
+                                </Badge>
+                                {canViewDetails && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => {
+                                      setViewingMember(member);
+                                      setViewMode('detail');
+                                    }}
+                                    className="h-6 px-2 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
+                                  >
+                                    View Full Profile
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="hidden sm:flex items-center gap-2">
                               <div className="text-[10px] font-bold text-muted-foreground uppercase">Profile</div>
                               <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                                 <motion.div 

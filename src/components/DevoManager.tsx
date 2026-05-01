@@ -134,10 +134,15 @@ export default function DevoManager() {
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
                     {d.cover_image_url ? (
-                      <img src={d.cover_image_url} alt={d.title} className="w-16 h-14 object-cover rounded-xl shrink-0" />
+                      <div className="relative group/thumb shrink-0">
+                        <img src={d.cover_image_url} alt={d.title} className="w-20 h-16 object-cover rounded-xl shadow-sm" />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                          <Eye className="w-4 h-4 text-white" />
+                        </div>
+                      </div>
                     ) : (
-                      <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-                        <Sun className="w-6 h-6" />
+                      <div className="w-16 h-16 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
+                        <Sun className="w-8 h-8" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -190,6 +195,16 @@ export default function DevoManager() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <ImageUpload
+                label="Cover Image"
+                hint="Visual asset for the devotional. Recommended 16:9 ratio."
+                value={form.cover_image_url}
+                onChange={url => setForm(f => ({ ...f, cover_image_url: url }))}
+                folder="ambassadors_assembly/devotionals"
+                aspectRatio="video"
+              />
             </div>
             <div className="space-y-2">
               <Label>Title *</Label>

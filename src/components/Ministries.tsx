@@ -67,8 +67,9 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
   const fetchMinistries = async () => {
     setLoading(true);
     try {
+      const targetTable = isDepartment ? 'church_departments' : 'ministries';
       let query = supabase
-        .from('ministries')
+        .from(targetTable)
         .select(`
           *,
           leader:profiles!leader_id (
@@ -76,7 +77,8 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
           ),
           co_leader:profiles!co_leader_id (
             id, first_name, last_name, avatar_url
-          )
+          ),
+          ${isDepartment ? 'workers:church_workers(count)' : 'members:ministry_members(count)'}
         `);
 
       if (search) query = query.ilike('name', `%${search}%`);
@@ -101,21 +103,29 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
     setSelectedMinistry(ministry);
     setMembersLoading(true);
     try {
+      const memberTable = isDepartment ? 'church_workers' : 'ministry_members';
+      const idColumn = isDepartment ? 'department_id' : 'ministry_id';
+      
       const { data, error } = await supabase
-        .from('ministry_members')
+        .from(memberTable)
         .select(`
           *,
-          profiles:user_id (
+          profiles!user_id (
             id, first_name, last_name, avatar_url, email, phone, title
-          )
+          )${isDepartment ? ', church_positions!position_id ( title )' : ''}
         `)
-        .eq('ministry_id', ministry.id)
+        .eq(idColumn as any, ministry.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error loading members for ${memberTable}:`, error);
+        throw error;
+      }
+      
       setMinistryMembers(data || []);
     } catch (err: any) {
-      toast.error("Failed to load ministry members");
+      console.error("Ministry Members Fetch Error:", err);
+      toast.error(`Failed to load ${isDepartment ? 'department' : 'ministry'} members: ${err.message}`);
     } finally {
       setMembersLoading(false);
     }
@@ -123,6 +133,15 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
 
   const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
     try {
+      const memberTable = isDepartment ? 'church_workers' : 'ministry_members';
+      // For church_workers, we might need to update status or position, but let's assume 'role' for now if they have it, 
+      // or just update ministry_members if that's what's intended.
+      // Actually, church_workers doesn't have 'role'. 
+      if (isDepartment) {
+        toast.info("Role updates for department workers are managed via HR");
+        return;
+      }
+
       const { error } = await supabase
         .from('ministry_members')
         .update({ role: newRole })
@@ -143,15 +162,22 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
       toast.error(err.message);
     }
   };
-
   const handleUpdateMemberStatus = async (memberId: string, newStatus: string) => {
     try {
-      // Store status as part of role field since ministry_members has no status column
-      const { error } = await (supabase
-        .from('ministry_members') as any)
-        .update({ status: newStatus })
+      const { error } = await supabase
+        .from('ministry_members')
+        .update({ is_active: newStatus === 'active' })
         .eq('id', memberId);
       if (error) throw error;
+      
+      await auditRepo.logAction({
+        admin_id: user?.id || 'unknown',
+        action: 'UPDATE',
+        table_name: 'ministry_members',
+        record_id: memberId,
+        new_values: { is_active: newStatus === 'active' }
+      });
+
       toast.success("Status updated");
       handleViewMinistry(selectedMinistry);
     } catch (err: any) {
@@ -162,12 +188,13 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
   const handleDelete = async (id: string) => {
     if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
     try {
-      const { error } = await supabase.from('ministries').delete().eq('id', id);
+      const targetTable = isDepartment ? 'church_departments' : 'ministries';
+      const { error } = await supabase.from(targetTable).delete().eq('id', id);
       if (error) throw error;
       await auditRepo.logAction({
         admin_id: user?.id || 'unknown',
         action: 'DELETE',
-        table_name: 'ministries',
+        table_name: targetTable,
         record_id: id
       });
       toast.success(`${isDepartment ? 'Department' : 'Ministry'} deleted successfully`);
@@ -492,7 +519,9 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
                       <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         <Users className="w-3 h-3" /> Members
                       </div>
-                      <p className="text-sm font-medium">{ministry.member_count || 0}</p>
+                      <p className="text-sm font-medium">
+                        {(isDepartment ? ministry.workers?.[0]?.count : ministry.members?.[0]?.count) || 0}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">

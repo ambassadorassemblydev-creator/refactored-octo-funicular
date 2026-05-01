@@ -72,22 +72,42 @@ export default function MinistryForm({ initialData, type = "ministry", onSuccess
     setLoading(true);
     const tableName = isDepartment ? "church_departments" : "ministries";
     try {
+      // Sanitize and map values based on table schema
+      const finalValues: any = {
+        name: values.name,
+        description: values.description,
+      };
+
+      if (isDepartment) {
+        finalValues.head_id = values.leader_id || null;
+        finalValues.is_active = values.status === "active";
+        // Departments don't have meeting_time/location in schema
+      } else {
+        finalValues.leader_id = values.leader_id || null;
+        finalValues.is_active = values.status === "active";
+        finalValues.meeting_time = values.meeting_time || null;
+        finalValues.meeting_location = values.location || null; // Fix: was meeting_location
+        finalValues.category = values.type || "General";
+        finalValues.slug = values.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      }
+
       if (initialData?.id) {
         const { error } = await supabase
           .from(tableName)
-          .update(values)
+          .update(finalValues)
           .eq("id", initialData.id);
         if (error) throw error;
         toast.success(`${isDepartment ? 'Department' : 'Ministry'} updated successfully`);
       } else {
         const { error } = await supabase
           .from(tableName)
-          .insert([values]);
+          .insert([finalValues]);
         if (error) throw error;
         toast.success(`${isDepartment ? 'Department' : 'Ministry'} created successfully`);
       }
       onSuccess();
     } catch (error: any) {
+      console.error(`Error saving ${tableName}:`, error);
       toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);

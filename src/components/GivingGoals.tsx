@@ -34,6 +34,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "motion/react";
@@ -68,6 +75,7 @@ export default function GivingGoals() {
     target_amount: "",
     start_date: "",
     end_date: "",
+    donation_type: "tithe",
   });
   const [saving, setSaving] = React.useState(false);
 
@@ -95,11 +103,10 @@ export default function GivingGoals() {
     setDonorsLoading(true);
     setDonors([]);
     try {
-      // Find donations linked to this goal's category_id or matching donation_type by title
       const { data } = await supabase
         .from("donations")
         .select("*")
-        .eq("category_id", goal.category_id)
+        .eq("donation_type", goal.donation_type)
         .order("created_at", { ascending: false });
       setDonors(data || []);
     } catch (err) {
@@ -122,11 +129,12 @@ export default function GivingGoals() {
       target_amount: goal.target_amount?.toString() || "",
       start_date: goal.start_date || "",
       end_date: goal.end_date || "",
+      donation_type: goal.donation_type || "tithe",
     });
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", target_amount: "", start_date: "", end_date: "" });
+    setForm({ title: "", description: "", target_amount: "", start_date: "", end_date: "", donation_type: "tithe" });
     setEditingGoal(null);
     setIsCreateOpen(false);
   };
@@ -144,6 +152,7 @@ export default function GivingGoals() {
         target_amount: parseFloat(form.target_amount),
         start_date: form.start_date || null,
         end_date: form.end_date || null,
+        donation_type: form.donation_type,
         is_active: true,
       };
 
@@ -342,6 +351,24 @@ export default function GivingGoals() {
               />
             </div>
             <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Link to Fund Type *</label>
+              <Select value={form.donation_type} onValueChange={(v: string | null) => setForm(p => ({ ...p, donation_type: v || 'tithe' }))}>
+                <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
+                  <SelectValue placeholder="Select fund type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tithe">Tithe</SelectItem>
+                  <SelectItem value="offering">Offering</SelectItem>
+                  <SelectItem value="building_fund">Building Fund</SelectItem>
+                  <SelectItem value="special">Special Seed</SelectItem>
+                  <SelectItem value="welfare">Welfare Fund</SelectItem>
+                  <SelectItem value="missions">Missions</SelectItem>
+                  <SelectItem value="other">General / Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[9px] text-muted-foreground italic">Contributions to this fund type will automatically count towards this goal.</p>
+            </div>
+            <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Target Amount (₦) *</label>
               <Input
                 type="number"
@@ -400,7 +427,7 @@ export default function GivingGoals() {
               <div className="py-14 text-center space-y-3">
                 <CreditCard className="w-12 h-12 text-muted-foreground mx-auto opacity-30" />
                 <p className="text-muted-foreground font-semibold">No donations recorded for this goal yet</p>
-                <p className="text-xs text-muted-foreground">Donations are matched by category. Make sure this goal has a linked category.</p>
+                <p className="text-xs text-muted-foreground">Donations are matched by the linked fund type: <span className="font-bold text-primary uppercase tracking-tighter">{viewingDonors?.donation_type?.replace('_',' ')}</span></p>
               </div>
             ) : donors.map((d: any) => (
               <div key={d.id} className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border/40">

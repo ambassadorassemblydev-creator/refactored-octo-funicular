@@ -30,8 +30,8 @@ const eventSchema = z.object({
   title: z.string().min(2, "Title is required"),
   description: z.string().min(10, "Description is required"),
   location_name: z.string().min(2, "Location is required"),
-  start_date: z.string().min(1, "Start date is required"),
-  end_date: z.string().min(1, "End date is required"),
+  start_date: z.preprocess((val) => (val === "" ? null : val), z.string().nullable()),
+  end_date: z.preprocess((val) => (val === "" ? null : val), z.string().nullable()),
   event_type: z.string().optional(),
   status: z.enum(["upcoming", "completed", "cancelled"]),
   cover_image_url: z.string().optional(),
@@ -81,9 +81,13 @@ export default function EventForm({ initialData, onSuccess, onCancel }: EventFor
         if (error) throw error;
         toast.success("Event updated successfully");
       } else {
+        const payload = {
+          ...values,
+          slug: values.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+        };
         const { error } = await supabase
           .from("events")
-          .insert([values]);
+          .insert([payload]);
         if (error) throw error;
         toast.success("Event created successfully");
       }

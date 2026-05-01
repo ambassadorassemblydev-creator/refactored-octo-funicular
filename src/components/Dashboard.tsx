@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   BarChart, 
   Bar, 
@@ -122,7 +123,7 @@ interface ChartDataItem {
 }
 
 export default function Dashboard({ onTabChange }: DashboardProps) {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user, role, roles, loading: authLoading } = useAuth();
   const [stats, setStats] = React.useState({
     members: 0,
     attendance: 0,
@@ -163,7 +164,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           supabase.from('ministries').select('*', { count: 'exact', head: true }),
           supabase.from('church_departments').select('*', { count: 'exact', head: true }),
           supabase.from('attendance_records').select('*', { count: 'exact', head: true }),
-          supabase.from('events').select('*').gte('start_date', new Date().toISOString().split('T')[0]).order('start_date', { ascending: true }).limit(3)
+          supabase.from('events').select('*, event_registrations(count)').gte('start_date', new Date().toISOString().split('T')[0]).order('start_date', { ascending: true }).limit(3)
         ]);
 
         const totalGiving = givingData?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
@@ -320,21 +321,44 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
               </span>
             </h1>
 
-            <div className="flex items-center gap-2 mt-1">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-bold uppercase tracking-widest">
-                <ShieldCheck className="w-3 h-3" />
-                {role ? role.replace('_', ' ') : 'Member'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {roles.length > 0 ? roles.map((r, i) => (
+                <div key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group hover:bg-white/20 transition-all duration-300">
+                  <ShieldCheck className={cn(
+                    "w-3.5 h-3.5",
+                    r === 'super_admin' ? "text-emerald-300 animate-pulse" : "text-white"
+                  )} />
+                  <span className={cn(
+                    "text-[10px] font-black uppercase tracking-[0.2em]",
+                    r === 'super_admin' ? "text-emerald-300" : "text-white"
+                  )}>
+                    {r.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              )) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group hover:bg-white/20 transition-all duration-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Member</span>
+                </div>
+              )}
             </div>
             <p className="text-primary-foreground/80 max-w-md text-sm md:text-lg font-medium">
               Your church community is thriving. Here's a snapshot of the impact you're making today.
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" className="rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6">
+              <Button 
+                variant="secondary" 
+                className="rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6 shadow-xl shadow-black/10"
+                onClick={() => document.getElementById('quick-actions-grid')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 Quick Actions
               </Button>
-              <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20 rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6">
+              <Button 
+                variant="outline" 
+                className="bg-white/10 border-white/20 hover:bg-white/20 rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] h-9 md:h-11 px-4 md:px-6"
+                onClick={() => onTabChange?.("reports")}
+              >
                 View Reports
               </Button>
             </div>
@@ -344,7 +368,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
             <div className="bg-white/10 backdrop-blur-md p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
               <Activity className="w-5 h-5 md:w-8 md:h-8 mb-1 md:mb-2 opacity-60" />
-              <span className="text-xl md:text-3xl font-bold">{loading ? "..." : "98%"}</span>
+              <span className="text-xl md:text-3xl font-bold">{loading ? "..." : (stats.members > 0 ? "98%" : "0%")}</span>
               <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">Engagement</span>
             </div>
             <div className="bg-white/10 backdrop-blur-md p-4 md:p-6 rounded-2xl md:rounded-3xl border border-white/10 flex flex-col items-center justify-center text-center">
@@ -410,7 +434,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
       </div>
 
       {/* Quick Actions Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+      <div id="quick-actions-grid" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 scroll-mt-10">
 
         {[
           { label: 'Add Member', icon: UserPlus, color: 'text-blue-500', bg: 'bg-blue-500/10', tab: 'members' },
@@ -418,7 +442,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           { label: 'Record Attendance', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10', tab: 'attendance' },
           { label: 'Upload Sermon', icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/10', tab: 'sermons' },
           { label: 'New Prayer', icon: MessageSquare, color: 'text-rose-500', bg: 'bg-rose-500/10', tab: 'prayers' },
-          { label: 'Settings', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-500/10', tab: 'admin' },
+          { label: 'Settings', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-500/10', tab: 'admin-settings' },
         ].map((action, i) => (
           <Button 
             key={i} 
@@ -489,6 +513,18 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
                     dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: '#fff' }}
                     activeDot={{ r: 6, strokeWidth: 0 }}
                   />
+                  {(role === 'super_admin' || role === 'admin' || role === 'pastor') && (
+                    <Area 
+                      type="monotone" 
+                      dataKey="giving" 
+                      stroke="hsl(var(--chart-2))" 
+                      fillOpacity={1} 
+                      fill="url(#colorGiving)" 
+                      strokeWidth={4}
+                      dot={{ r: 4, fill: 'hsl(var(--chart-2))', strokeWidth: 2, stroke: '#fff' }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -602,7 +638,12 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate group-hover:text-primary transition-colors">{event.title}</p>
-                    <p className="text-[10px] text-muted-foreground font-medium">{event.location_name || 'Church Hall'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] text-muted-foreground font-medium">{event.location_name || 'Church Hall'}</p>
+                      <Badge className="bg-primary/5 text-primary border-none text-[8px] h-4 px-1.5 font-bold uppercase tracking-widest">
+                        {(event as any).event_registrations?.[0]?.count || 0} Reg.
+                      </Badge>
+                    </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
                 </div>
@@ -623,25 +664,37 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
         </Card>
 
         <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm rounded-3xl overflow-hidden p-6 flex flex-col justify-between bg-gradient-to-br from-primary/5 to-transparent">
-          <div className="space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-emerald-600" />
+          {(role === 'super_admin' || role === 'admin' || role === 'pastor') ? (
+            <>
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold">Giving Goal</h3>
+                  <p className="text-sm text-muted-foreground">You're ₦2,500 away from your monthly mission goal.</p>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "75%" }}
+                    className="h-full bg-emerald-500"
+                  />
+                </div>
+              </div>
+              <Button variant="outline" className="w-full mt-6 rounded-xl font-bold uppercase tracking-widest text-[10px] h-11" onClick={() => onTabChange?.('giving-goals')}>
+                View Campaigns
+              </Button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-8">
+              <ShieldCheck className="w-12 h-12 text-muted-foreground/20" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Access Restricted</p>
+                <p className="text-[10px] text-muted-foreground">Financial insights are reserved for administrative roles.</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold">Giving Goal</h3>
-              <p className="text-sm text-muted-foreground">You're ₦2,500 away from your monthly mission goal.</p>
-            </div>
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: "75%" }}
-                className="h-full bg-emerald-500"
-              />
-            </div>
-          </div>
-          <Button variant="outline" className="w-full mt-6 rounded-xl font-bold uppercase tracking-widest text-[10px] h-11">
-            View Campaigns
-          </Button>
+          )}
         </Card>
       </div>
       </div>

@@ -51,28 +51,42 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
   const [loading, setLoading] = React.useState(false);
   const [series, setSeries] = React.useState<any[]>([]);
 
+  const [isSeriesDialogOpen, setIsSeriesDialogOpen] = React.useState(false);
+  const [newSeriesTitle, setNewSeriesTitle] = React.useState("");
+  const [creatingSeries, setCreatingSeries] = React.useState(false);
+
+  const fetchSeries = async () => {
+    const { data } = await supabase.from('sermon_series').select('id, title');
+    setSeries(data || []);
+  };
+
   React.useEffect(() => {
-    async function fetchSeries() {
-      const { data } = await supabase.from('sermon_series').select('id, title');
-      setSeries(data || []);
-    }
     fetchSeries();
   }, []);
 
-  const form = useForm<z.input<typeof sermonSchema>>({
-    resolver: zodResolver(sermonSchema),
-    defaultValues: initialData ? {
-      ...initialData,
-      speaker_name: initialData.sermon_speakers?.name || "",
-      sermon_date: initialData.sermon_date ? new Date(initialData.sermon_date).toISOString().slice(0, 10) : "",
-    } : {
-      title: "",
-      description: "",
-      speaker_name: "",
-      sermon_date: new Date().toISOString().slice(0, 10),
-      status: "published",
-    },
-  });
+  const handleCreateSeries = async () => {
+    if (!newSeriesTitle.trim()) return;
+    setCreatingSeries(true);
+    try {
+      const slug = newSeriesTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const { data, error } = await supabase
+        .from('sermon_series')
+        .insert([{ title: newSeriesTitle.trim(), slug }])
+        .select('id, title')
+        .single();
+      
+      if (error) throw error;
+      toast.success("New series created!");
+      setSeries([...series, data]);
+      form.setValue("series_id", data.id);
+      setIsSeriesDialogOpen(false);
+      setNewSeriesTitle("");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setCreatingSeries(false);
+    }
+  };
 
   async function onSubmit(values: any) {
     setLoading(true);
@@ -101,7 +115,8 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
 
       // Build the payload without speaker_name (not a DB column)
       const { speaker_name, ...rest } = values;
-      const payload = { ...rest, speaker_id };
+      const slug = values.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const payload = { ...rest, speaker_id, slug };
 
       if (initialData?.id) {
         const { error } = await supabase
@@ -176,14 +191,26 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
           name="series_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Sermon Series</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <div className="flex items-center justify-between">
+                <FormLabel>Sermon Series</FormLabel>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80"
+                  onClick={() => setIsSeriesDialogOpen(true)}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add New Series
+                </Button>
+              </div>
+              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a series" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="none">Standalone / No Series</SelectItem>
                   {series.map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
                   ))}
@@ -267,7 +294,7 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
             <FormItem>
               <ImageUpload
                 label="Sermon Thumbnail"
-                hint="Recommended: 16:9 ratio (1280×720). Shown as the sermon card preview image."
+                hint="Recommended: 16:9 ratio (1280\u00d7720). Shown as the sermon card preview image."
                 value={field.value}
                 onChange={field.onChange}
                 folder="ambassadors_assembly/sermons"
@@ -288,6 +315,40 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
           </Button>
         </div>
       </form>
+
+      {/* Quick Series Add Dialog */}
+      <Dialog open={isSeriesDialogOpen} onOpenChange={setIsSeriesDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add New Sermon Series</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Series Title</label>
+              <Input 
+                placeholder="e.g. The Year of Flourishing" 
+                value={newSeriesTitle} 
+                onChange={e => setNewSeriesTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setIsSeriesDialogOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={handleCreateSeries} 
+                disabled={creatingSeries || !newSeriesTitle.trim()}
+              >
+                {creatingSeries ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                Create Series
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Form>
   );
+}
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
 }

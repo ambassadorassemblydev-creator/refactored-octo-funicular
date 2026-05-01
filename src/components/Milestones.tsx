@@ -12,7 +12,9 @@ import {
   Star,
   PartyPopper,
   ChevronRight,
-  Heart
+  Heart,
+  Briefcase,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,18 +28,22 @@ import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
+import SendEmailDialog from "./SendEmailDialog";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Milestone = {
   id: string;
   name: string;
-  type: "Birthday" | "Anniversary";
+  type: "Birthday" | "Anniversary" | "Job Promotion" | "Celebration" | "Other";
   date: string;
   original_date: string;
   image: string | null;
   status: "Today" | "Upcoming" | "Past";
   day: number;
   month: number;
+  email?: string;
+  phone?: string;
+  description?: string;
 };
 
 
@@ -45,22 +51,33 @@ export default function Milestones() {
   const [milestones, setMilestones] = React.useState<Milestone[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
+  const [emailDialog, setEmailDialog] = React.useState({ open: false, to: "", subject: "" });
 
   const fetchMilestones = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Profiles (for Bdays and Anniversaries)
+      const { data: profiles, error: pError } = await supabase
         .from('profiles')
         .select('*');
 
-      if (error) throw error;
+      if (pError) throw pError;
+
+      // 2. Fetch Member Milestones (for Job Promotions etc)
+      const { data: customMilestones, error: mError } = await supabase
+        .from('member_milestones')
+        .select('*, profiles(first_name, last_name, avatar_url, email, phone)');
+
+      if (mError) throw mError;
 
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentDay = now.getDate();
 
       const list: Milestone[] = [];
-      data?.forEach(p => {
+
+      // Process Birthdays & Anniversaries from Profiles
+      profiles?.forEach(p => {
         if (p.date_of_birth) {
           const d = new Date(p.date_of_birth);
           const month = d.getMonth() + 1;
@@ -79,7 +96,9 @@ export default function Milestones() {
             image: p.avatar_url,
             status,
             day,
-            month
+            month,
+            email: p.email,
+            phone: p.phone
           });
         }
         if (p.wedding_anniversary) {
@@ -93,14 +112,50 @@ export default function Milestones() {
 
           list.push({
             id: `${p.id}-anniv`,
-            name: `${p.first_name} & Partner`, // Ideally we'd have partner name
+            name: `${p.first_name} & Partner`,
             type: "Anniversary",
             date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
             original_date: p.wedding_anniversary,
             image: p.avatar_url,
             status,
             day,
-            month
+            month,
+            email: p.email,
+            phone: p.phone
+          });
+        }
+      });
+
+      // Process Custom Milestones (Job Promotions etc)
+      customMilestones?.forEach(m => {
+        if (m.milestone_date) {
+          const d = new Date(m.milestone_date);
+          const month = d.getMonth() + 1;
+          const day = d.getDate();
+
+          let status: "Today" | "Upcoming" | "Past" = "Upcoming";
+          if (month === currentMonth && day === currentDay) status = "Today";
+          else if (month < currentMonth || (month === currentMonth && day < currentDay)) status = "Past";
+
+          const profile = m.profiles as any;
+          
+          let type: Milestone["type"] = "Other";
+          if (m.milestone_type === "job_promotion") type = "Job Promotion";
+          if (m.milestone_type === "celebration") type = "Celebration";
+
+          list.push({
+            id: m.id,
+            name: `${profile?.first_name} ${profile?.last_name}`,
+            type,
+            date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            original_date: m.milestone_date,
+            image: profile?.avatar_url,
+            status,
+            day,
+            month,
+            email: profile?.email,
+            phone: profile?.phone,
+            description: m.description
           });
         }
       });
@@ -128,6 +183,14 @@ export default function Milestones() {
     m.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const openMail = (to: string, name: string, type: string) => {
+    setEmailDialog({
+      open: true,
+      to,
+      subject: `Special Message from Ambassadors Assembly: Happy ${type}, ${name}!`
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -135,6 +198,17 @@ export default function Milestones() {
       </div>
     );
   }
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "Birthday": return Cake;
+      case "Anniversary": return Heart;
+      case "Job Promotion": return Briefcase;
+      case "Celebration": return Trophy;
+      default: return Star;
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -161,6 +235,7 @@ export default function Milestones() {
                 <TabsTrigger value="all" className="flex-1 sm:flex-none rounded-xl px-6 font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-card data-[state=active]:shadow-sm">All</TabsTrigger>
                 <TabsTrigger value="birthdays" className="flex-1 sm:flex-none rounded-xl px-6 font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-card data-[state=active]:shadow-sm">Birthdays</TabsTrigger>
                 <TabsTrigger value="anniversaries" className="flex-1 sm:flex-none rounded-xl px-6 font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-card data-[state=active]:shadow-sm">Anniversaries</TabsTrigger>
+                <TabsTrigger value="promotions" className="flex-1 sm:flex-none rounded-xl px-6 font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-card data-[state=active]:shadow-sm">Promotions</TabsTrigger>
               </TabsList>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -173,113 +248,82 @@ export default function Milestones() {
               </div>
             </div>
 
-            <TabsContent value="all" className="space-y-4">
-              {filteredMilestones.map((item) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="bg-card/50 backdrop-blur-xl p-4 rounded-3xl shadow-xl border border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-muted/20 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-4 border-background shadow-lg shrink-0">
-                      <AvatarImage src={item.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.name}`} />
-                      <AvatarFallback>{item.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-base truncate">{item.name}</h4>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="outline" className={cn(
-                          "border-none text-[8px] font-bold uppercase tracking-widest",
-                          item.type === "Birthday" ? "bg-blue-500/10 text-blue-600" : "bg-purple-500/10 text-purple-600"
-                        )}>
-                          {item.type}
-                        </Badge>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.date}</span>
-                        {item.status === "Today" && <Badge className="bg-primary text-primary-foreground text-[8px] font-bold uppercase tracking-widest animate-pulse">Today</Badge>}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary">
-                        <Mail className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary">
-                        <Phone className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Button className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2 flex-1 sm:flex-none">
-                      <Gift className="w-4 h-4" />
-                      <span className="hidden xs:inline">Send Gift</span>
-                      <span className="xs:hidden">Gift</span>
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
-            </TabsContent>
-
-            <TabsContent value="birthdays" className="space-y-4">
-              {filteredMilestones.filter(m => m.type === "Birthday").map((item) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="bg-card/50 backdrop-blur-xl p-4 rounded-3xl shadow-xl border border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-muted/20 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-4 border-background shadow-lg shrink-0">
-                      <AvatarImage src={item.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.name}`} />
-                      <AvatarFallback>{item.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-base truncate">{item.name}</h4>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="outline" className="border-none text-[8px] font-bold uppercase tracking-widest bg-blue-500/10 text-blue-600">
-                          {item.type}
-                        </Badge>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <Button className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2">
-                    <Gift className="w-4 h-4" />
-                    Celebrating
-                  </Button>
-                </motion.div>
-              ))}
-            </TabsContent>
-
-            <TabsContent value="anniversaries" className="space-y-4">
-              {filteredMilestones.filter(m => m.type === "Anniversary").map((item) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="bg-card/50 backdrop-blur-xl p-4 rounded-3xl shadow-xl border border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-muted/20 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-4 border-background shadow-lg shrink-0">
-                      <AvatarImage src={item.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.name}`} />
-                      <AvatarFallback>{item.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-base truncate">{item.name}</h4>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="outline" className="border-none text-[8px] font-bold uppercase tracking-widest bg-purple-500/10 text-purple-600">
-                          {item.type}
-                        </Badge>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <Button className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2">
-                    <Heart className="w-4 h-4" />
-                    Loved
-                  </Button>
-                </motion.div>
-              ))}
-            </TabsContent>
+            {["all", "birthdays", "anniversaries", "promotions"].map((tab) => (
+              <TabsContent key={tab} value={tab} className="space-y-4">
+                {filteredMilestones
+                  .filter(m => {
+                    if (tab === "all") return true;
+                    if (tab === "birthdays") return m.type === "Birthday";
+                    if (tab === "anniversaries") return m.type === "Anniversary";
+                    if (tab === "promotions") return m.type === "Job Promotion";
+                    return true;
+                  })
+                  .map((item) => {
+                    const Icon = getIcon(item.type);
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-card/50 backdrop-blur-xl p-4 rounded-3xl shadow-xl border border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-muted/20 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-12 w-12 sm:h-14 sm:w-14 border-4 border-background shadow-lg shrink-0">
+                            <AvatarImage src={item.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.name}`} />
+                            <AvatarFallback>{item.name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-base truncate">{item.name}</h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <Badge variant="outline" className={cn(
+                                "border-none text-[8px] font-bold uppercase tracking-widest",
+                                item.type === "Birthday" ? "bg-blue-500/10 text-blue-600" : 
+                                item.type === "Anniversary" ? "bg-purple-500/10 text-purple-600" :
+                                item.type === "Job Promotion" ? "bg-emerald-500/10 text-emerald-600" :
+                                "bg-amber-500/10 text-amber-600"
+                              )}>
+                                <Icon className="w-2 h-2 mr-1" />
+                                {item.type}
+                              </Badge>
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.date}</span>
+                              {item.status === "Today" && <Badge className="bg-primary text-primary-foreground text-[8px] font-bold uppercase tracking-widest animate-pulse">Today</Badge>}
+                            </div>
+                            {item.description && <p className="text-[10px] text-muted-foreground mt-1 italic line-clamp-1">{item.description}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary"
+                              onClick={() => item.email && openMail(item.email, item.name, item.type)}
+                              disabled={!item.email}
+                            >
+                              <Mail className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary"
+                              asChild
+                            >
+                              <a href={`tel:${item.phone}`} disabled={!item.phone}>
+                                <Phone className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          </div>
+                          <Button className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2 flex-1 sm:flex-none" onClick={() => toast.success(`Gift flow initiated for ${item.name}`)}>
+                            <Gift className="w-4 h-4" />
+                            <span className="hidden xs:inline">Send Gift</span>
+                            <span className="xs:hidden">Gift</span>
+                          </Button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+              </TabsContent>
+            ))}
           </Tabs>
         </div>
 
@@ -300,7 +344,15 @@ export default function Milestones() {
                 </p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="secondary" className="w-full rounded-2xl h-12 font-bold uppercase tracking-widest text-[10px]">
+                <Button 
+                  variant="secondary" 
+                  className="w-full rounded-2xl h-12 font-bold uppercase tracking-widest text-[10px]"
+                  disabled={!milestones.find(m => m.status === "Today")?.email}
+                  onClick={() => {
+                    const m = milestones.find(m => m.status === "Today");
+                    if (m && m.email) openMail(m.email, m.name, m.type);
+                  }}
+                >
                   Send Congrats
                 </Button>
               </div>
@@ -337,7 +389,15 @@ export default function Milestones() {
           </Card>
         </div>
       </div>
+
+      <SendEmailDialog 
+        open={emailDialog.open}
+        onOpenChange={(open) => setEmailDialog(prev => ({ ...prev, open }))}
+        defaultTo={emailDialog.to}
+        defaultSubject={emailDialog.subject}
+      />
     </div>
   );
 }
+
 

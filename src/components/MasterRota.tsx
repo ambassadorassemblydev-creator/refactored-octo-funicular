@@ -57,21 +57,25 @@ export default function MasterRota() {
         .from('worker_schedules')
         .select(`
           *,
-          user:user_id (
+          user:profiles!worker_schedules_user_id_fkey (
             id,
             first_name,
             last_name,
             avatar_url
           ),
-          department:department_id (
+          department:church_departments!worker_schedules_department_id_fkey (
             name
           )
         `)
         .order('schedule_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Master Rota Fetch Error:", error);
+        throw error;
+      }
       setSchedules(data || []);
     } catch (error: any) {
+      console.error("Master Rota Exception:", error);
       toast.error("Error fetching schedules: " + error.message);
     } finally {
       setLoading(false);
