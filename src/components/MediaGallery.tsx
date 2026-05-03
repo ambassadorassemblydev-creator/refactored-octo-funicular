@@ -60,10 +60,18 @@ export default function MediaGallery() {
 
   const CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || 'dxwhpacz7';
   const getCloudinaryUrl = (item: any) => {
-    if (item.cloudinary_public_id && CLOUD_NAME) {
-      return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${item.cloudinary_public_id}`;
+    if (item.cloudinary_url) return item.cloudinary_url;
+    if (item.thumbnail_url) return item.thumbnail_url;
+    if (item.url) return item.url;
+    return 'https://images.unsplash.com/photo-1510076857177-7470076d4098?q=80&w=2072&auto=format&fit=crop';
+  };
+
+  const getIcon = (media_type: string) => {
+    switch (media_type) {
+      case 'video': return Video;
+      case 'document': return FileText;
+      default: return Image;
     }
-    return item.url || item.media_url || `https://picsum.photos/seed/${item.id}/800/600`;
   };
 
   const fetchMedia = async (retries = 3) => {

@@ -474,8 +474,8 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
             </div>
           </CardHeader>
           <CardContent className="pl-2">
-            <div className="h-[350px] w-full min-h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[350px] w-full min-h-[350px] relative">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={chartData.length > 0 ? chartData : chartData}>
                   <defs>
                     <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
@@ -588,9 +588,9 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           <CardHeader>
             <CardTitle className="text-lg font-bold">Ministry Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center min-h-[200px]">
+          <CardContent className="flex justify-center min-h-[200px] relative">
             <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie
                     data={ministryDistribution}

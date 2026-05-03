@@ -55,44 +55,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     let mounted = true;
 
-    // High IQ: Forced auth resolution
-
-    async function getInitialSession(retries = 3) {
-      try {
-        // Only call getSession initially to avoid concurrent auth calls that cause lock issues
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) throw sessionError;
-
-        if (mounted) {
-          if (session) {
-            setSession(session);
-            setUser(session.user);
-            await Promise.all([
-              fetchRole(session.user.id),
-              refreshProfile()
-            ]);
-          } else {
-            setLoading(false);
-          }
-        }
-      } catch (error: any) {
-        if (error?.message?.includes("Lock") && retries > 0) {
-          console.warn(`Auth lock detected, retrying... (${retries} left)`);
-          return getInitialSession(retries - 1);
-        }
-        console.error("Error getting session:", error);
-        if (mounted) setLoading(false);
+    // High IQ Safety: If auth doesn't resolve within 15s, force loading to false to prevent infinite preloader
+    const safetyTimeout = setTimeout(() => {
+      if (loading && mounted) {
+        console.warn('[Auth] Safety timeout triggered. Forcing preloader to resolve.');
+        setLoading(false);
       }
-    }
+    }, 15000);
 
-    getInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // High IQ: Use onAuthStateChange as the single source of truth for session and role resolution.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[Auth] State Change: ${event}`);
+      
       if (mounted) {
+        clearTimeout(safetyTimeout); // Auth resolved, clear the safety timeout
+        
         setSession(session);
         setUser(session?.user ?? null);
+
         if (session?.user) {
+          // Resolve role and profile
           await Promise.all([
             fetchRole(session.user.id),
             refreshProfile()
@@ -100,6 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setRole(null);
           setRoles([]);
+          setPermissions({});
           setLoading(false);
         }
       }
@@ -108,11 +91,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
   const fetchRole = async (userId: string, retries = 2) => {
+    // High IQ: Guard against redundant calls while loading
+    if (loading && role && user?.id === userId) return;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s safety timeout
+
     try {
+      setLoading(true);
       console.log(`[Auth] Resolving role for user: ${userId}`);
 
       // 1. High IQ: Fetch all active roles and prioritize the most powerful one
@@ -126,14 +117,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           )
         `)
         .eq('user_id', userId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .abortSignal(controller.signal);
 
       if (dbError) {
         console.warn('[Auth] Database role fetch error:', dbError);
       }
 
       if (dbData && dbData.length > 0) {
-        // High IQ: Rank roles to ensure Super Admin/Admin/Pastor take precedence over 'worker' or 'member'
         const roleRanking: Record<string, number> = {
           'super_admin': 100,
           'admin': 80,
@@ -159,7 +150,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setRole(highestRole.name as Role);
         setRoles(sortedRoles.map(r => r.name as Role));
         
-        // Merge all permissions from all active roles
         const mergedPermissions = sortedRoles.reduce((acc, curr) => ({
           ...acc,
           ...curr.permissions
@@ -167,12 +157,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         setPermissions(mergedPermissions);
         setLoading(false);
+        clearTimeout(timeoutId);
         return; 
       }
 
-      // 2. Fallback: Check app_metadata (Fast but can be stale)
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      const metadataRole = user?.app_metadata?.role;
+      // 2. Fallback: Check app_metadata
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const metadataRole = authUser?.app_metadata?.role;
       
       if (metadataRole) {
         const formattedRole = metadataRole.toLowerCase().replace(/\s+/g, '_') as Role;
@@ -180,18 +171,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setRole(formattedRole);
         setRoles([formattedRole]);
         setLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
       // 3. Last Resort Fallback: Check profiles table
-      const { data: profile } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('role_claim')
         .eq('id', userId)
         .maybeSingle();
       
-      if (profile?.role_claim) {
-        const formattedRole = profile.role_claim.toLowerCase().trim().replace(/\s+/g, '_') as Role;
+      if (profileData?.role_claim) {
+        const formattedRole = profileData.role_claim.toLowerCase().trim().replace(/\s+/g, '_') as Role;
         console.log(`[Auth] Role resolved from Profile Claim: ${formattedRole}`);
         setRole(formattedRole);
         setRoles([formattedRole]);
@@ -203,15 +195,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setPermissions({});
 
     } catch (err: any) {
-      if (retries > 0) {
+      if (err.name === 'AbortError') {
+        console.error('[Auth] Role resolution timed out after 10s. Defaulting to member for safety.');
+      } else if (retries > 0) {
         console.warn(`[Auth] Role fetch failed, retrying... (${retries} left)`, err);
         return fetchRole(userId, retries - 1);
+      } else {
+        console.error('[Auth] Final role fetch failure, defaulting to member:', err);
       }
-      console.error('[Auth] Final role fetch failure, defaulting to member:', err);
       setRole('member');
       setRoles(['member']);
     } finally {
       setLoading(false);
+      clearTimeout(timeoutId);
     }
   };
 

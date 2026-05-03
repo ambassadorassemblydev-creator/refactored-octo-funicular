@@ -427,8 +427,9 @@ export default function Finance() {
               <CardHeader>
                 <CardTitle className="text-xl font-bold">Allocation</CardTitle>
               </CardHeader>
-              <CardContent className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <CardContent className="h-[400px] relative">
+                {activeTab === "analytics" && (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie data={fundDistribution} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value">
                       {fundDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -436,14 +437,16 @@ export default function Finance() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card className="border-none shadow-xl bg-card/50 backdrop-blur-xl rounded-[2rem]">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold">Growth Trend</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
+              )}
+            </CardContent>
+          </Card>
+          <Card className="border-none shadow-xl bg-card/50 backdrop-blur-xl rounded-[2rem]">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">Growth Trend</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[400px] relative">
+              {activeTab === "analytics" && (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={monthlyChartData}>
                     <defs>
                       <linearGradient id="colorG" x1="0" y1="0" x2="0" y2="1">
@@ -455,9 +458,10 @@ export default function Finance() {
                     <Area type="monotone" dataKey="amount" stroke="hsl(var(--primary))" fill="url(#colorG)" strokeWidth={4} />
                   </AreaChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
         </TabsContent>
 
         {isSuperAdmin && (

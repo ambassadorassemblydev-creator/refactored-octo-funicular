@@ -51,6 +51,7 @@ import { useAuth } from "@/src/contexts/AuthContext";
 export default function GivingGoals() {
   const { user, role } = useAuth();
   const [goals, setGoals] = React.useState<any[]>([]);
+  const [categories, setCategories] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   if (role !== 'admin' && role !== 'super_admin' && role !== 'pastor') {
@@ -68,16 +69,31 @@ export default function GivingGoals() {
   const [donors, setDonors] = React.useState<any[]>([]);
   const [donorsLoading, setDonorsLoading] = React.useState(false);
 
-  // Form state
   const [form, setForm] = React.useState({
     title: "",
     description: "",
     target_amount: "",
     start_date: "",
     end_date: "",
-    donation_type: "tithe",
+    category_id: "",
   });
   const [saving, setSaving] = React.useState(false);
+
+  const fetchCategories = async () => {
+    try {
+      const { data } = await supabase
+        .from("donation_categories")
+        .select("id, name, slug")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+      setCategories(data || []);
+      if (data && data.length > 0 && !form.category_id) {
+        setForm(p => ({ ...p, category_id: data[0].id }));
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+    }
+  };
 
   const fetchGoals = async () => {
     setLoading(true);
@@ -97,6 +113,7 @@ export default function GivingGoals() {
 
   React.useEffect(() => {
     fetchGoals();
+    fetchCategories();
   }, []);
 
   const fetchDonors = async (goal: any) => {
@@ -106,7 +123,7 @@ export default function GivingGoals() {
       const { data } = await supabase
         .from("donations")
         .select("*")
-        .eq("donation_type", goal.donation_type)
+        .eq("category_id", goal.category_id)
         .order("created_at", { ascending: false });
       setDonors(data || []);
     } catch (err) {
@@ -129,12 +146,12 @@ export default function GivingGoals() {
       target_amount: goal.target_amount?.toString() || "",
       start_date: goal.start_date || "",
       end_date: goal.end_date || "",
-      donation_type: goal.donation_type || "tithe",
+      category_id: goal.category_id || "",
     });
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", target_amount: "", start_date: "", end_date: "", donation_type: "tithe" });
+    setForm({ title: "", description: "", target_amount: "", start_date: "", end_date: "", category_id: categories[0]?.id || "" });
     setEditingGoal(null);
     setIsCreateOpen(false);
   };
@@ -152,7 +169,7 @@ export default function GivingGoals() {
         target_amount: parseFloat(form.target_amount),
         start_date: form.start_date || null,
         end_date: form.end_date || null,
-        donation_type: form.donation_type,
+        category_id: form.category_id,
         is_active: true,
       };
 
@@ -351,22 +368,18 @@ export default function GivingGoals() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Link to Fund Type *</label>
-              <Select value={form.donation_type} onValueChange={(v: string | null) => setForm(p => ({ ...p, donation_type: v || 'tithe' }))}>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Link to Fund Category *</label>
+              <Select value={form.category_id} onValueChange={(v: string) => setForm(p => ({ ...p, category_id: v }))}>
                 <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
-                  <SelectValue placeholder="Select fund type" />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tithe">Tithe</SelectItem>
-                  <SelectItem value="offering">Offering</SelectItem>
-                  <SelectItem value="building_fund">Building Fund</SelectItem>
-                  <SelectItem value="special">Special Seed</SelectItem>
-                  <SelectItem value="welfare">Welfare Fund</SelectItem>
-                  <SelectItem value="missions">Missions</SelectItem>
-                  <SelectItem value="other">General / Other</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <p className="text-[9px] text-muted-foreground italic">Contributions to this fund type will automatically count towards this goal.</p>
+              <p className="text-[9px] text-muted-foreground italic">Contributions to this category will automatically count towards this goal.</p>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Target Amount (₦) *</label>
@@ -427,7 +440,7 @@ export default function GivingGoals() {
               <div className="py-14 text-center space-y-3">
                 <CreditCard className="w-12 h-12 text-muted-foreground mx-auto opacity-30" />
                 <p className="text-muted-foreground font-semibold">No donations recorded for this goal yet</p>
-                <p className="text-xs text-muted-foreground">Donations are matched by the linked fund type: <span className="font-bold text-primary uppercase tracking-tighter">{viewingDonors?.donation_type?.replace('_',' ')}</span></p>
+                <p className="text-xs text-muted-foreground">Donations are matched by the linked category: <span className="font-bold text-primary uppercase tracking-tighter">{categories.find(c => c.id === viewingDonors?.category_id)?.name || 'Unknown'}</span></p>
               </div>
             ) : donors.map((d: any) => (
               <div key={d.id} className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border/40">

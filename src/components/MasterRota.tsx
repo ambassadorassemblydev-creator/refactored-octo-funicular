@@ -42,48 +42,66 @@ import { cn } from "@/src/lib/utils";
 import { auditRepo } from "@/src/lib/audit";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
+import ShiftForm from "./forms/ShiftForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function MasterRota() {
   const { user } = useAuth();
   const [schedules, setSchedules] = React.useState<any[]>([]);
+  const [workers, setWorkers] = React.useState<any[]>([]);
+  const [departments, setDepartments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [isAssignOpen, setIsAssignOpen] = React.useState(false);
   const [view, setView] = React.useState<'list' | 'calendar'>('list');
   const [filterDept, setFilterDept] = React.useState("all");
 
-  const fetchSchedules = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('worker_schedules')
-        .select(`
-          *,
-          user:profiles!worker_schedules_user_id_fkey (
-            id,
-            first_name,
-            last_name,
-            avatar_url
-          ),
-          department:church_departments!worker_schedules_department_id_fkey (
-            name
-          )
-        `)
-        .order('schedule_date', { ascending: true });
+      const [schedulesRes, workersRes, deptsRes] = await Promise.all([
+        supabase
+          .from('worker_schedules')
+          .select(`
+            *,
+            user:profiles!worker_schedules_user_id_fkey (
+              id,
+              first_name,
+              last_name,
+              avatar_url
+            ),
+            department:church_departments!worker_schedules_department_id_fkey (
+              name
+            )
+          `)
+          .order('schedule_date', { ascending: true }),
+        supabase
+          .from('church_workers')
+          .select('*, profiles(first_name, last_name, avatar_url)'),
+        supabase
+          .from('church_departments')
+          .select('id, name')
+          .eq('is_active', true)
+      ]);
 
-      if (error) {
-        console.error("Master Rota Fetch Error:", error);
-        throw error;
-      }
-      setSchedules(data || []);
+      if (schedulesRes.error) throw schedulesRes.error;
+      setSchedules(schedulesRes.data || []);
+      setWorkers(workersRes.data || []);
+      setDepartments(deptsRes.data || []);
     } catch (error: any) {
-      console.error("Master Rota Exception:", error);
-      toast.error("Error fetching schedules: " + error.message);
+      toast.error("Error fetching data: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   React.useEffect(() => {
-    fetchSchedules();
+    fetchData();
   }, []);
 
   const handleStatusToggle = async (id: string, currentStatus: boolean) => {
@@ -96,7 +114,7 @@ export default function MasterRota() {
       if (error) throw error;
       
       toast.success(`Attendance updated`);
-      fetchSchedules();
+      fetchData();
 
       // Audit log
       await auditRepo.logAction({
@@ -111,15 +129,58 @@ export default function MasterRota() {
     }
   };
 
+  const handleAssignShift = async (data: any) => {
+    setLoading(true);
+    try {
+      const worker = workers.find(w => w.user_id === data.user_id);
+      const { error } = await supabase
+        .from('worker_schedules')
+        .insert([{
+          user_id: data.user_id,
+          worker_id: worker?.id,
+          department_id: data.department_id,
+          service_name: data.service_name,
+          schedule_date: data.schedule_date.toISOString().split('T')[0],
+          shift_start: data.shift_start,
+          shift_end: data.shift_end,
+          role_for_day: data.role_for_day,
+          attended: false
+        }]);
+
+      if (error) throw error;
+      toast.success("Shift assigned successfully");
+      setIsAssignOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign New Shift</DialogTitle>
+            <DialogDescription>Assign a worker to a specific service and department.</DialogDescription>
+          </DialogHeader>
+          <ShiftForm 
+            workers={workers} 
+            departments={departments} 
+            onSubmit={handleAssignShift} 
+            onCancel={() => setIsAssignOpen(false)} 
+          />
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tighter">Master Rota</h1>
           <p className="text-muted-foreground font-medium">Coordinate the workforce for upcoming services and events.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="rounded-xl h-10 px-4 font-bold text-[10px] uppercase tracking-widest gap-2 bg-card border-none shadow-sm">
+          <Button variant="outline" onClick={() => setIsAssignOpen(true)} className="rounded-xl h-10 px-4 font-bold text-[10px] uppercase tracking-widest gap-2 bg-card border-none shadow-sm">
             <Plus className="w-4 h-4" />
             Assign Shift
           </Button>
@@ -192,7 +253,7 @@ export default function MasterRota() {
                 <p className="font-bold">No schedules found</p>
                 <p className="text-sm text-muted-foreground">Start by assigning workers to upcoming services.</p>
               </div>
-              <Button variant="outline" className="rounded-xl font-bold uppercase text-[10px] tracking-widest">
+              <Button variant="outline" onClick={() => setIsAssignOpen(true)} className="rounded-xl font-bold uppercase text-[10px] tracking-widest">
                 Create First Shift
               </Button>
             </CardContent>

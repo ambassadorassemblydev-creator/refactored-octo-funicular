@@ -5,7 +5,7 @@ import { Upload, X, Image, Loader2, CheckCircle2 } from "lucide-react";
 
 interface ImageUploadProps {
   value?: string | null;
-  onChange: (url: string) => void;
+  onChange: (url: string, publicId?: string) => void;
   onClear?: () => void;
   label?: string;
   hint?: string;
@@ -67,7 +67,7 @@ export function ImageUpload({
       formData.append("folder", folder);
 
       // Use XHR for progress tracking
-      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+      const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
 
@@ -93,7 +93,7 @@ export function ImageUpload({
         xhr.send(formData);
       });
 
-      onChange(result.secure_url);
+      onChange(result.secure_url, result.public_id);
       toast.success("Image uploaded successfully!");
     } catch (err: any) {
       toast.error(err.message || "Upload failed. Please try again.");

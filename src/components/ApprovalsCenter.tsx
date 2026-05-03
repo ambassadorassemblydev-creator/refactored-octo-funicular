@@ -121,7 +121,8 @@ export default function ApprovalsCenter() {
     volunteers: [],
     ministries: [],
     testimonies: [],
-    prayers: []
+    prayers: [],
+    outreach: []
   });
   const [roles, setRoles] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
@@ -135,14 +136,16 @@ export default function ApprovalsCenter() {
         { data: ministries },
         { data: testimonies },
         { data: prayers },
+        { data: outreach },
         { data: rData },
         { data: dData }
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('already_serving', true).eq('approval_status', 'pending'),
         supabase.from('volunteer_applications').select('*, church_departments(name), church_positions(title)').eq('status', 'pending'),
         supabase.from('ministry_members').select('*, ministries(name), profiles:user_id(first_name, last_name, email, avatar_url)').eq('role', 'pending'),
-        supabase.from('testimonies').select('*').eq('status', 'pending' as any),
+        supabase.from('testimonies').select('*').eq('is_approved', false),
         supabase.from('prayer_requests').select('id, title, description, requester_name, requester_email, created_at, is_urgent, category, recaptcha_score, is_public').eq('is_approved', false).is('approved_at', null),
+        supabase.from('event_registrations').select('*, events!inner(*), profiles:user_id(*)').eq('is_confirmed', false).eq('events.event_type', 'outreach'),
         supabase.from('roles').select('id, name'),
         supabase.from('church_departments').select('id, name')
       ]);
@@ -152,11 +155,13 @@ export default function ApprovalsCenter() {
         volunteers: volunteers || [],
         ministries: ministries || [],
         testimonies: testimonies || [],
-        prayers: prayers || []
+        prayers: prayers || [],
+        outreach: outreach || []
       });
       setRoles(rData || []);
       setDepartments(dData || []);
     } catch (error: any) {
+      console.error("Fetch Data Error:", error);
       toast.error("Failed to load approval items");
     } finally {
       setLoading(false);
@@ -187,7 +192,10 @@ export default function ApprovalsCenter() {
           break;
         case 'testimonies':
           table = 'testimonies';
-          updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
+          updateData = { 
+            is_approved: action === 'approve',
+            status: action === 'approve' ? 'published' : 'archived'
+          };
           break;
         case 'prayers':
           table = 'prayer_requests';
@@ -195,6 +203,10 @@ export default function ApprovalsCenter() {
             is_approved: action === 'approve',
             approved_at: action === 'approve' ? new Date().toISOString() : null
           };
+          break;
+        case 'outreach':
+          table = 'event_registrations';
+          updateData = { is_confirmed: action === 'approve' };
           break;
       }
 
@@ -277,11 +289,12 @@ export default function ApprovalsCenter() {
       <Tabs defaultValue="staff" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="bg-muted/50 p-1 rounded-2xl h-14 w-full justify-start overflow-x-auto no-scrollbar mb-8 gap-1">
           {[
-            { id: "staff", label: "Staff Verifications", icon: Shield },
-            { id: "volunteers", label: "Outreach & Projects", icon: Users },
+            { id: "staff", label: "Staff", icon: Shield },
+            { id: "volunteers", label: "Applications", icon: Users },
             { id: "ministries", label: "Ministry Joins", icon: HeartHandshake },
+            { id: "outreach", label: "Outreach Regs", icon: ExternalLink },
             { id: "testimonies", label: "Testimonies", icon: MessageSquare },
-            { id: "prayers", label: "Prayer Requests", icon: MessageSquare },
+            { id: "prayers", label: "Prayers", icon: MessageSquare },
           ].map((tab) => (
             <TabsTrigger 
               key={tab.id} 
@@ -399,6 +412,30 @@ export default function ApprovalsCenter() {
               )}
             </TabsContent>
 
+            <TabsContent value="outreach" className="space-y-4">
+              {data.outreach.length === 0 ? <EmptyState icon={ExternalLink} title="No pending outreach registrations" /> : (
+                <div className="grid gap-4">
+                  {data.outreach.map((item: any) => (
+                    <ApprovalCard 
+                      key={item.id} 
+                      title={item.guest_name || `${item.profiles?.first_name} ${item.profiles?.last_name}`}
+                      subtitle={item.guest_email || item.profiles?.email}
+                      meta={`Event: ${item.events?.title}`}
+                      avatar={item.profiles?.avatar_url}
+                      onApprove={() => handleAction('outreach', item.id, 'approve', item)}
+                      onReject={() => handleAction('outreach', item.id, 'reject', item)}
+                    >
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-muted-foreground font-medium">Guests: {item.number_of_guests}</p>
+                        {item.notes && <p className="text-xs text-muted-foreground italic">"{item.notes}"</p>}
+                        <Badge variant="outline" className="mt-2 bg-blue-500/10 text-blue-600 border-none text-[8px] font-bold uppercase tracking-widest">{item.events?.event_type}</Badge>
+                      </div>
+                    </ApprovalCard>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="testimonies" className="space-y-4">
               {data.testimonies.length === 0 ? <EmptyState icon={MessageSquare} title="No pending testimonies" /> : (
                 <div className="grid gap-4">
@@ -442,7 +479,8 @@ export default function ApprovalsCenter() {
               )}
             </TabsContent>
           </>
-        )}
+        )
+}
       </Tabs>
     </div>
   );

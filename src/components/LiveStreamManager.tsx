@@ -180,10 +180,31 @@ export default function LiveStreamManager() {
       scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
       actual_start: form.status === "live" ? new Date().toISOString() : null
     };
+    const isNewLive = form.status === "live" && (!editingStream || editingStream.status !== "live");
+    
     const { error } = editingStream
       ? await supabase.from("live_streams").update(payload as any).eq("id", editingStream.id)
       : await supabase.from("live_streams").insert(payload as any);
+    
     if (error) { toast.error(error.message); return; }
+
+    // High IQ: Auto-broadcast push notification if just went live
+    if (isNewLive) {
+      try {
+        await fetch(`${import.meta.env.VITE_MAIN_APP_URL || ''}/api/notifications/broadcast`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            title: "🔴 WE ARE LIVE!", 
+            body: `Join us now for: ${form.title}`, 
+            url: "/watch" 
+          })
+        });
+        toast.success("Push notification broadcasted to all members!");
+      } catch (broadcastErr) {
+        console.error("Auto-broadcast failed:", broadcastErr);
+      }
+    }
     toast.success(editingStream ? "Stream updated!" : form.status === "live" ? "🔴 Broadcasting started!" : "Stream scheduled!");
     setIsFormOpen(false);
     fetchData();

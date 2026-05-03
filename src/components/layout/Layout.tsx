@@ -177,6 +177,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     { id: "admin-system", icon: Server, label: "System Status", category: "System" },
     { id: "admin-audit", icon: History, label: "Audit Logs", category: "System" },
     { id: "reports", icon: FileText, label: "Reports", category: "System" },
+    { id: "notifications", icon: Bell, label: "Notifications", category: "System" },
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -467,7 +468,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                   ))}
                 </div>
                 <div className="p-2 border-t text-center">
-                  <Button variant="ghost" className="w-full text-xs h-8">View all notifications</Button>
+                  <Button variant="ghost" className="w-full text-xs h-8" onClick={() => onTabChange("notifications")}>View all notifications</Button>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -475,9 +476,12 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
             <DropdownMenu>
               <DropdownMenuTrigger className="relative h-12 w-12 rounded-2xl p-0 hover:bg-muted transition-all overflow-hidden border-2 border-transparent hover:border-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-lg">
                 <Avatar className="h-full w-full rounded-none">
-                  <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} alt="User" />
-                  <AvatarFallback className="rounded-none bg-primary text-primary-foreground font-bold">
-                    {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                  <AvatarImage 
+                    src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} 
+                    alt="User" 
+                  />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                    {(profile?.first_name?.[0] || user?.user_metadata?.full_name?.[0] || 'A').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
@@ -485,7 +489,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                 <DropdownMenuLabel className="font-normal p-2">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-bold leading-none">
-                      {profile ? `${profile.first_name} ${profile.last_name || ''}` : (user?.user_metadata?.full_name || 'Ambassador')}
+                      {profile ? `${profile.first_name} ${profile.last_name || ''}` : (user?.user_metadata?.full_name || user?.user_metadata?.name || 'Ambassador')}
                     </p>
                     <p className="text-[10px] leading-none text-muted-foreground uppercase tracking-widest mt-1">{user?.email}</p>
                     <div className="flex flex-wrap gap-1 mt-2">

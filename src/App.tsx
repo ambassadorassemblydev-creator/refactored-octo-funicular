@@ -35,6 +35,7 @@ import DevoManager from "./components/DevoManager";
 import NewsletterManager from "./components/NewsletterManager";
 import ApprovalsCenter from "./components/ApprovalsCenter";
 import Broadcast from "./components/Broadcast";
+import Notifications from "./components/Notifications";
 import { Toaster } from "sonner";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -266,8 +267,9 @@ function AppContent() {
       case "broadcast":
         return <Broadcast />;
       case "approvals":
-
         return <ApprovalsCenter />;
+      case "notifications":
+        return <Notifications />;
       default:
         return <Dashboard />;
     }
