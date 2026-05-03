@@ -8,6 +8,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   role: Role | null;
+  roles: Role[];
   profile: any | null;
   loading: boolean;
   isRoleResolving: boolean;
@@ -19,6 +20,7 @@ const AuthContext = React.createContext<AuthContextType>({
   session: null,
   user: null,
   role: null,
+  roles: [],
   profile: null,
   loading: true,
   isRoleResolving: false,
@@ -30,6 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = React.useState<Session | null>(null);
   const [user, setUser] = React.useState<User | null>(null);
   const [role, setRole] = React.useState<Role | null>(null);
+  const [roles, setRoles] = React.useState<Role[]>([]);
   const [profile, setProfile] = React.useState<any | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [isRoleResolving, setIsRoleResolving] = React.useState(false);
@@ -45,6 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('[Auth] Profile fetch error:', error.message);
         setRole('member');
+        setRoles(['member']);
         return;
       }
 
@@ -56,10 +60,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           full_name: data.full_name || authUser.user_metadata?.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim()
         });
 
-        // Simple: role_claim is the single source of truth
+        // Use role_claim as the single source of truth as requested
         const userRole = (data.role_claim || 'member').toLowerCase().trim().replace(/\s+/g, '_') as Role;
         console.log(`[Auth] Role resolved: ${userRole}`);
+        
         setRole(userRole);
+        setRoles([userRole]); // Provide array for UI compatibility
       } else {
         // Brand new user with no profile row yet
         setProfile({
@@ -69,11 +75,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           full_name: authUser.user_metadata?.full_name
         });
         setRole('member');
+        setRoles(['member']);
         console.log('[Auth] No profile found, defaulting to member.');
       }
     } catch (err) {
       console.error('[Auth] Unexpected error during profile fetch:', err);
       setRole('member');
+      setRoles(['member']);
     }
   };
 
@@ -128,6 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         // Signed out
         setRole(null);
+        setRoles([]);
         setProfile(null);
         setIsRoleResolving(false);
       }
@@ -140,7 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, profile, loading, isRoleResolving, hasPermission, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, role, roles, profile, loading, isRoleResolving, hasPermission, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
