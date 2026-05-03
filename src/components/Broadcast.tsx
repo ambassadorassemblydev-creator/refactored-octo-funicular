@@ -68,12 +68,15 @@ export default function Broadcast() {
         setBody("");
         setUrl("/");
       } else {
-        throw new Error(result.error || "Broadcast failed");
+        const errorMsg = result.error || result.message || `Broadcast failed with status ${response.status}: ${response.statusText}`;
+        throw new Error(errorMsg);
       }
     } catch (err: any) {
+      console.error('[Broadcast] Error:', err);
       toast.error(err.message || "Something went wrong during broadcast.");
     } finally {
       setLoading(false);
+      clearTimeout(safetyTimeout);
     }
   };
 

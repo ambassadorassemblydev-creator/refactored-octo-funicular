@@ -114,7 +114,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    initAuth();
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('[Auth] Initialization timed out after 5s. Forcing ready state.');
+        setIsRoleResolving(false);
+        setLoading(false);
+        if (!role) setRole('member');
+      }
+    }, 5000);
+
+    initAuth().finally(() => clearTimeout(timeoutId));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log(`[Auth] State Change: ${event}`);
@@ -124,6 +133,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setSession(newSession);
       setUser(newSession?.user ?? null);
+
+      const changeTimeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn('[Auth] Auth change resolve timed out after 5s.');
+          setIsRoleResolving(false);
+        }
+      }, 5000);
 
       try {
         if (newSession?.user) {
@@ -137,6 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('[Auth] Auth change error:', err);
       } finally {
         if (mounted) setIsRoleResolving(false);
+        clearTimeout(changeTimeoutId);
       }
     });
 

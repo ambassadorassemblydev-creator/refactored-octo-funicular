@@ -136,24 +136,47 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
   const [chartData, setChartData] = React.useState<ChartDataItem[]>([]);
   const [ministryDistribution, setMinistryDistribution] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [activeGoal, setActiveGoal] = React.useState<any>(null);
   const [profile, setProfile] = React.useState<{ first_name: string | null; last_name: string | null; title: string | null; avatar_url: string | null; ministry: string | null; department: string | null } | null>(null);
 
   React.useEffect(() => {
-    async function fetchDashboardData(retries = 3) {
+    const fetchDashboardData = async (retries = 3) => {
+      setLoading(true);
+      const safetyTimeout = setTimeout(() => {
+        console.warn('[Dashboard] Data fetch timed out after 5s. Forcing ready.');
+        setLoading(false);
+      }, 5000);
+
       if (!user) {
-        setLoading(false); // High IQ: Ensure we stop loading even if no user yet
+        setLoading(false);
+        clearTimeout(safetyTimeout);
         return;
       }
       
       try {
-        // Fetch profile for personalized greeting
         const { data: profileData } = await supabase
           .from('profiles')
           .select('first_name, last_name, title, avatar_url, ministry, department')
           .eq('id', user.id)
           .maybeSingle();
         if (profileData) setProfile(profileData);
-        // Fetch Stats
+
+        const { data: buildingFundData } = await supabase
+          .from('donation_categories')
+          .select('*')
+          .eq('is_building_fund', true)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (buildingFundData) {
+          setActiveGoal({
+            title: buildingFundData.name,
+            target_amount: parseFloat(buildingFundData.goal_amount || "0"),
+            current_amount: parseFloat(buildingFundData.current_amount || "0")
+          });
+        }
+
         const [
           { count: memberCount },
           { data: givingData },
@@ -182,7 +205,6 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
 
         setUpcomingEvents(eventsData || []);
 
-        // Fetch Recent Activity (Combining multiple sources)
         const [
           { data: recentMembers },
           { data: recentSermons },
@@ -283,8 +305,9 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
         console.error("Error fetching dashboard data:", error);
       } finally {
         setLoading(false);
+        clearTimeout(safetyTimeout);
       }
-    }
+    };
 
     if (!authLoading) {
       fetchDashboardData();
@@ -688,13 +711,17 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
                   <TrendingUp className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-xl font-bold">Giving Goal</h3>
-                  <p className="text-sm text-muted-foreground">You're ₦2,500 away from your monthly mission goal.</p>
+                  <h3 className="text-xl font-bold">{activeGoal?.title || 'Giving Goal'}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {activeGoal 
+                      ? `₦${(activeGoal.target_amount - (activeGoal.current_amount || 0)).toLocaleString()} away from goal.`
+                      : "No active fundraising campaign at the moment."}
+                  </p>
                 </div>
                 <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: "75%" }}
+                    animate={{ width: activeGoal ? `${Math.min(100, (activeGoal.current_amount || 0) / activeGoal.target_amount * 100)}%` : "0%" }}
                     className="h-full bg-emerald-500"
                   />
                 </div>
