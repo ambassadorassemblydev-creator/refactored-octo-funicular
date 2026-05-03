@@ -114,16 +114,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    const timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.warn('[Auth] Initialization timed out after 5s. Forcing ready state.');
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && (loading || isRoleResolving)) {
+        console.warn('[Auth] Initialization safety timeout reached. Forcing state resolution.');
+        
+        // High IQ Fallback: Try to get role from user metadata if DB fetch hung
+        if (!role && user) {
+          const metaRole = user.user_metadata?.role || user.user_metadata?.role_claim;
+          if (metaRole) {
+            console.log(`[Auth] Recovered role from metadata: ${metaRole}`);
+            setRole(metaRole as Role);
+          } else {
+            setRole('member');
+          }
+        }
+        
         setIsRoleResolving(false);
         setLoading(false);
-        if (!role) setRole('member');
       }
-    }, 5000);
+    }, 8000); // Increased to 8s to allow Supabase's 5s lock recovery to finish first
 
-    initAuth().finally(() => clearTimeout(timeoutId));
+    initAuth().finally(() => clearTimeout(safetyTimeout));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log(`[Auth] State Change: ${event}`);
@@ -135,11 +146,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(newSession?.user ?? null);
 
       const changeTimeoutId = setTimeout(() => {
-        if (mounted) {
-          console.warn('[Auth] Auth change resolve timed out after 5s.');
+        if (mounted && isRoleResolving) {
+          console.warn('[Auth] Auth change resolve safety timeout reached.');
           setIsRoleResolving(false);
+          if (!role && newSession?.user) {
+            const metaRole = newSession.user.user_metadata?.role || newSession.user.user_metadata?.role_claim;
+            if (metaRole) setRole(metaRole as Role);
+            else setRole('member');
+          }
         }
-      }, 5000);
+      }, 8000);
 
       try {
         if (newSession?.user) {
