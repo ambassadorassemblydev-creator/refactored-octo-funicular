@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile({
           ...data,
           avatar_url: data.avatar_url || authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture,
-          full_name: data.full_name || authUser.user_metadata?.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim()
+          full_name: authUser.user_metadata?.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim()
         });
 
         // Use role_claim as the single source of truth as requested
