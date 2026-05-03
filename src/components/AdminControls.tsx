@@ -4,7 +4,7 @@ import {
   Users, Save, Plus, History, Activity, AlertTriangle, CheckCircle2,
   ChevronRight, Edit2, Trash2, Key, Cloud, Search, Download, Megaphone,
   Link, Phone, MapPin, Instagram, Youtube, Facebook, Twitter, Rss,
-  MessageSquare, ToggleLeft, ToggleRight, Palette
+  MessageSquare, ToggleLeft, ToggleRight, Palette, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -656,7 +656,7 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
                       className="pl-10 h-11 bg-background/50 border-none rounded-xl"
                     />
                   </div>
-                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <Select value={selectedRole} onValueChange={(val) => setSelectedRole(val || "member")}>
                     <SelectTrigger className="w-full sm:w-40 h-11 bg-background/50 border-none rounded-xl">
                       <SelectValue />
                     </SelectTrigger>

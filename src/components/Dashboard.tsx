@@ -123,7 +123,7 @@ interface ChartDataItem {
 }
 
 export default function Dashboard({ onTabChange }: DashboardProps) {
-  const { user, role, roles, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const [stats, setStats] = React.useState({
     members: 0,
     attendance: 0,
@@ -136,7 +136,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
   const [chartData, setChartData] = React.useState<ChartDataItem[]>([]);
   const [ministryDistribution, setMinistryDistribution] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [profile, setProfile] = React.useState<{ first_name: string | null; last_name: string | null; title: string | null; avatar_url: string | null } | null>(null);
+  const [profile, setProfile] = React.useState<{ first_name: string | null; last_name: string | null; title: string | null; avatar_url: string | null; ministry: string | null; department: string | null } | null>(null);
 
   React.useEffect(() => {
     async function fetchDashboardData(retries = 3) {
@@ -146,7 +146,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
         // Fetch profile for personalized greeting
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('first_name, last_name, title, avatar_url')
+          .select('first_name, last_name, title, avatar_url, ministry, department')
           .eq('id', user.id)
           .maybeSingle();
         if (profileData) setProfile(profileData);
@@ -322,23 +322,37 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              {roles.length > 0 ? roles.map((r, i) => (
-                <div key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group hover:bg-white/20 transition-all duration-300">
-                  <ShieldCheck className={cn(
-                    "w-3.5 h-3.5",
-                    r === 'super_admin' ? "text-emerald-300 animate-pulse" : "text-white"
-                  )} />
-                  <span className={cn(
-                    "text-[10px] font-black uppercase tracking-[0.2em]",
-                    r === 'super_admin' ? "text-emerald-300" : "text-white"
-                  )}>
-                    {r.replace(/_/g, ' ')}
+              {/* Primary Role Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group hover:bg-white/20 transition-all duration-300">
+                <ShieldCheck className={cn(
+                  "w-3.5 h-3.5",
+                  role === 'super_admin' ? "text-emerald-300 animate-pulse" : "text-white"
+                )} />
+                <span className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.2em]",
+                  role === 'super_admin' ? "text-emerald-300" : "text-white"
+                )}>
+                  {role?.replace(/_/g, ' ') || 'Member'}
+                </span>
+              </div>
+
+              {/* Ministry Badge */}
+              {profile?.ministry && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 backdrop-blur-md border border-emerald-500/30 shadow-lg">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
+                    {profile.ministry}
                   </span>
                 </div>
-              )) : (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group hover:bg-white/20 transition-all duration-300">
-                  <ShieldCheck className="w-3.5 h-3.5 text-white" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Member</span>
+              )}
+
+              {/* Department Badge */}
+              {profile?.department && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/20 backdrop-blur-md border border-blue-500/30 shadow-lg">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">
+                    {profile.department}
+                  </span>
                 </div>
               )}
             </div>

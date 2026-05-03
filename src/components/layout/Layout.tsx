@@ -84,7 +84,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }: any) => 
 export default function Layout({ children, onTabChange, activeTab }: { children: React.ReactNode, onTabChange: (tab: string) => void, activeTab: string }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const { user, role, roles, profile, loading: authLoading } = useAuth();
+  const { user, role, profile, loading: authLoading } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
@@ -493,13 +493,17 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                     </p>
                     <p className="text-[10px] leading-none text-muted-foreground uppercase tracking-widest mt-1">{user?.email}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {roles.length > 0 ? roles.map((r, i) => (
-                        <span key={i} className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary w-fit">
-                          {r.replace(/_/g, ' ')}
+                      <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary w-fit">
+                        {role?.replace(/_/g, ' ') || 'Member'}
+                      </span>
+                      {profile?.ministry && (
+                        <span className="inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-emerald-600 w-fit">
+                          {profile.ministry}
                         </span>
-                      )) : (
-                        <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary w-fit">
-                          Member
+                      )}
+                      {profile?.department && (
+                        <span className="inline-flex items-center rounded-md border border-blue-500/20 bg-blue-500/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-blue-600 w-fit">
+                          {profile.department}
                         </span>
                       )}
                     </div>

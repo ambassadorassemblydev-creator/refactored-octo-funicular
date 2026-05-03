@@ -59,7 +59,7 @@ const profileSchema = z.object({
 import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function ProfileSettings() {
-  const { user, profile, roles, loading: authLoading, refreshProfile } = useAuth();
+  const { user, profile, role, loading: authLoading, refreshProfile } = useAuth();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
@@ -232,17 +232,29 @@ export default function ProfileSettings() {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Member since {profile?.created_at ? new Date(profile.created_at).getFullYear() : '2024'}</p>
                 </div>
 
-                  <div className="flex flex-col gap-2 pt-4 border-t border-muted/50">
+                  <div className="flex flex-col gap-2 pt-4 border-t border-muted/50 w-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Roles</span>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {roles.length > 0 ? roles.map((r, i) => (
-                          <Badge key={i} variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">{r.replace(/_/g, ' ')}</Badge>
-                        )) : (
-                          <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">Member</Badge>
-                        )}
-                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Role</span>
+                      <Badge variant="outline" className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">
+                        {role?.replace(/_/g, ' ') || 'Member'}
+                      </Badge>
                     </div>
+                    {profile?.ministry && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ministry</span>
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">
+                          {profile.ministry}
+                        </Badge>
+                      </div>
+                    )}
+                    {profile?.department && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</span>
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-none text-[8px] font-bold uppercase py-0 px-1.5 h-5">
+                          {profile.department}
+                        </Badge>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Verification</span>
                       <Badge 
@@ -257,12 +269,6 @@ export default function ProfileSettings() {
                       </Badge>
                     </div>
                   </div>
-                  {profile?.department && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</span>
-                      <span className="text-xs font-bold text-foreground">{profile.department}</span>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
