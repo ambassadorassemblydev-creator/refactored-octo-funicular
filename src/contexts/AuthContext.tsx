@@ -12,6 +12,7 @@ interface AuthContextType {
   profile: any | null;
   permissions: Record<string, boolean>;
   loading: boolean;
+  isRoleResolving: boolean;
   hasPermission: (permission: string) => boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -24,6 +25,7 @@ const AuthContext = React.createContext<AuthContextType>({
   profile: null,
   permissions: {},
   loading: true,
+  isRoleResolving: true,
   hasPermission: () => false,
   refreshProfile: async () => {},
 });
@@ -36,6 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = React.useState<any | null>(null);
   const [permissions, setPermissions] = React.useState<Record<string, boolean>>({});
   const [loading, setLoading] = React.useState(true);
+  const [isRoleResolving, setIsRoleResolving] = React.useState(true);
 
   const refreshProfile = async () => {
     if (!user) return;
@@ -44,7 +47,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .select('*')
       .eq('id', user.id)
       .maybeSingle();
-    if (data) setProfile(data);
+    
+    // High IQ: Merge DB profile with Auth metadata (e.g. Google avatar)
+    if (data) {
+      setProfile({
+        ...data,
+        avatar_url: data.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture,
+        full_name: data.full_name || user.user_metadata?.full_name || `${data.first_name} ${data.last_name}`
+      });
+    } else if (user.user_metadata) {
+      // Fallback for brand new users without a DB profile yet
+      setProfile({
+        id: user.id,
+        email: user.email,
+        avatar_url: user.user_metadata.avatar_url || user.user_metadata.picture,
+        full_name: user.user_metadata.full_name
+      });
+    }
   };
 
   const hasPermission = (permission: string) => {
@@ -68,23 +87,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log(`[Auth] State Change: ${event}`);
       
       if (mounted) {
-        clearTimeout(safetyTimeout); // Auth resolved, clear the safety timeout
-        
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // High IQ: If we have a session, we are no longer "loading" the auth state
+        setLoading(false);
 
         if (session?.user) {
-          // Resolve role and profile
+          setIsRoleResolving(true);
           await Promise.all([
             fetchRole(session.user.id),
             refreshProfile()
           ]);
+          setIsRoleResolving(false);
         } else {
           setRole(null);
           setRoles([]);
           setPermissions({});
-          setLoading(false);
+          setIsRoleResolving(false);
         }
+        
+        clearTimeout(safetyTimeout);
       }
     });
 
@@ -103,7 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s safety timeout
 
     try {
-      setLoading(true);
+      // Don't set global loading here, let isRoleResolving handle it
       console.log(`[Auth] Resolving role for user: ${userId}`);
 
       // 1. High IQ: Fetch all active roles and prioritize the most powerful one
@@ -201,19 +224,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.warn(`[Auth] Role fetch failed, retrying... (${retries} left)`, err);
         return fetchRole(userId, retries - 1);
       } else {
-        console.error('[Auth] Final role fetch failure, defaulting to member:', err);
+        console.error('[Auth] Final role fetch failure:', err);
       }
-      setRole('member');
-      setRoles(['member']);
+      
+      // Safety Fallback: Use existing role if we have one, otherwise member
+      if (!role) {
+        setRole('member');
+        setRoles(['member']);
+      }
     } finally {
-      setLoading(false);
+      // High IQ: Always ensure loading is false after a resolution attempt
+      if (mounted) {
+        setLoading(false);
+      }
       clearTimeout(timeoutId);
     }
   };
 
 
   return (
-    <AuthContext.Provider value={{ session, user, role, roles, profile, permissions, loading, hasPermission, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, role, roles, profile, permissions, loading, isRoleResolving, hasPermission, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

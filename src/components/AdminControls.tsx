@@ -61,6 +61,11 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
   const [settings, setSettings] = React.useState<Settings>({});
   const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
   const [roles, setRoles] = React.useState<any[]>([]);
+  const [userSearch, setUserSearch] = React.useState("");
+  const [foundUsers, setFoundUsers] = React.useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = React.useState(false);
+  const [assigningId, setAssigningId] = React.useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = React.useState<string>("member");
   const [activeTab, setActiveTabState] = React.useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("tab") || defaultTab;
@@ -228,6 +233,61 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
   };
 
   const removeTime = (t: string) => setBar((b: any) => ({ ...b, times: b.times.filter((x: string) => x !== t) }));
+
+  const handleUserSearch = async () => {
+    if (userSearch.length < 2) return;
+    setSearchingUsers(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .or(`first_name.ilike.%${userSearch}%,last_name.ilike.%${userSearch}%,email.ilike.%${userSearch}%`)
+        .limit(5);
+      setFoundUsers(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSearchingUsers(false);
+    }
+  };
+
+  const assignRole = async (userId: string) => {
+    setAssigningId(userId);
+    try {
+      // 1. Get role ID
+      const { data: roleData } = await supabase.from('roles').select('id').eq('name', selectedRole).single();
+      if (!roleData) throw new Error("Role not found");
+
+      // 2. Upsert user_roles
+      const { error } = await supabase.from('user_roles').upsert({
+        user_id: userId,
+        role_id: roleData.id,
+        is_active: true
+      }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      // 3. Update profile role_claim (fallback)
+      await supabase.from('profiles').update({ role_claim: selectedRole }).eq('id', userId);
+
+      toast.success(`Role '${selectedRole}' assigned successfully!`);
+      setFoundUsers([]);
+      setUserSearch("");
+      
+      await auditRepo.logAction({
+        admin_id: user?.id || 'unknown',
+        action: 'UPDATE',
+        table_name: 'user_roles',
+        record_id: userId,
+        new_values: { role: selectedRole }
+      });
+
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   const SaveBtn = ({ keys }: { keys: string[] }) => (
     <Button disabled={saving} onClick={() => saveSettings(keys)} className="ml-auto gap-2 rounded-xl h-11 px-6 shadow-lg shadow-primary/20">
@@ -587,7 +647,72 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
                 <CardDescription className="text-[10px] font-bold uppercase tracking-widest">Define and manage permissions</CardDescription>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-8">
+              {/* Quick Assign Section */}
+              <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 space-y-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" /> Quick Role Assign
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground font-medium">Search for any member to instantly upgrade their permissions.</p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search member name or email..." 
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleUserSearch()}
+                      className="pl-10 h-11 bg-background/50 border-none rounded-xl"
+                    />
+                  </div>
+                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                    <SelectTrigger className="w-full sm:w-40 h-11 bg-background/50 border-none rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="pastor">Pastor</SelectItem>
+                      <SelectItem value="leader">Leader</SelectItem>
+                      <SelectItem value="worker">Worker</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleUserSearch} disabled={searchingUsers} className="rounded-xl h-11 px-6">
+                    {searchingUsers ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                  </Button>
+                </div>
+
+                {foundUsers.length > 0 && (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
+                    {foundUsers.map(u => (
+                      <div key={u.id} className="flex items-center justify-between p-3 rounded-2xl bg-background shadow-sm border border-border/50">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="h-10 w-10 p-0 rounded-full flex items-center justify-center overflow-hidden border-none bg-muted/20">
+                            <img src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} alt="" />
+                          </Badge>
+                          <div>
+                            <p className="text-xs font-bold">{u.first_name} {u.last_name}</p>
+                            <p className="text-[10px] text-muted-foreground">{u.email}</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="rounded-lg h-8 text-[9px] font-black uppercase tracking-widest px-4"
+                          onClick={() => assignRole(u.id)}
+                          disabled={assigningId === u.id}
+                        >
+                          {assigningId === u.id ? "Assigning..." : `Assign ${selectedRole}`}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-3">
                 {(roles.length > 0 ? roles : [
                   { name: "super_admin", description: "Full system access — all controls" },

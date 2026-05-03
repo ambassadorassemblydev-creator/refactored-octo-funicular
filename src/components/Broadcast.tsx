@@ -10,6 +10,7 @@ import {
   Loader2,
   Link as LinkIcon
 } from "lucide-react";
+import { supabase } from "@/src/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,16 +37,29 @@ export default function Broadcast() {
     setStatus(null);
 
     try {
-      // High IQ: Calling the main server API
+      // 1. Get the session token from local storage or context
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // High IQ: Calling the main server API with the token
       const response = await fetch(`${import.meta.env.VITE_MAIN_APP_URL || 'http://localhost:3000'}/api/notifications/broadcast`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ title, body, url })
       });
 
-      const result = await response.json();
+      // Handle empty or non-JSON response gracefully
+      const contentType = response.headers.get("content-type");
+      let result;
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          result = await response.json();
+      } else {
+          const text = await response.text();
+          result = { error: text || "An unexpected error occurred" };
+      }
 
       if (response.ok) {
         toast.success(`Broadcast Successful! Sent to ${result.sent} devices.`);

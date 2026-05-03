@@ -166,7 +166,18 @@ function AppContent() {
   // ==========================================
   // RBAC GATEKEEPER (High IQ Security)
   // ==========================================
-  const { role } = useAuth();
+  const { role, isRoleResolving } = useAuth();
+  
+  // High IQ: If we are still resolving roles, don't kick them out yet
+  if (isRoleResolving) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+        <p className="text-white font-bold uppercase tracking-widest text-[10px]">Resolving Identity...</p>
+      </div>
+    );
+  }
+
   const isAuthorized = role && ['super_admin', 'admin', 'pastor', 'leader'].includes(role);
 
   if (!isAuthorized) {

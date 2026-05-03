@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { ImageUpload } from "@/src/components/ui/ImageUpload";
 import { supabase } from "@/src/lib/supabase";
 import { useAuth } from "@/src/contexts/AuthContext";
@@ -443,23 +446,125 @@ export default function LiveStreamManager() {
               <p className="text-xs text-muted-foreground">For YouTube: replace /watch?v= with /embed/</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              {/* High IQ: Searchable Speaker Selection */}
+              <div className="space-y-2 flex flex-col">
                 <Label>Speaker</Label>
-                <Select value={form.speaker_id || ""} onValueChange={v => setForm(f => ({ ...f, speaker_id: v || "" }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Speaker" /></SelectTrigger>
-                  <SelectContent>
-                    {speakers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      {form.speaker_id
+                        ? speakers.find((s) => s.id === form.speaker_id)?.name
+                        : "Select Speaker..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search speaker..." />
+                      <CommandList>
+                        <CommandEmpty>No speaker found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setForm(f => ({ ...f, speaker_id: "" }));
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !form.speaker_id ? "opacity-100" : "opacity-0")} />
+                            No Speaker
+                          </CommandItem>
+                          {speakers.map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={s.name}
+                              onSelect={() => {
+                                setForm(f => ({ ...f, speaker_id: s.id }));
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", form.speaker_id === s.id ? "opacity-100" : "opacity-0")} />
+                              {s.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="space-y-2">
+
+              {/* High IQ: Searchable Series Selection with Quick Create */}
+              <div className="space-y-2 flex flex-col">
                 <Label>Sermon Series</Label>
-                <Select value={form.series_id || ""} onValueChange={v => setForm(f => ({ ...f, series_id: v || "" }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Series" /></SelectTrigger>
-                  <SelectContent>
-                    {series.map(s => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      {form.series_id
+                        ? series.find((s) => s.id === form.series_id)?.title
+                        : "Select Series..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search series..." />
+                      <CommandList>
+                        <CommandEmpty>No series found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setForm(f => ({ ...f, series_id: "" }));
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !form.series_id ? "opacity-100" : "opacity-0")} />
+                            No Series
+                          </CommandItem>
+                          {series.map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={s.title}
+                              onSelect={() => {
+                                setForm(f => ({ ...f, series_id: s.id }));
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", form.series_id === s.id ? "opacity-100" : "opacity-0")} />
+                              {s.title}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandSeparator />
+                        <CommandGroup>
+                          <CommandItem 
+                            onSelect={async () => {
+                              const newTitle = prompt("Enter new series title:");
+                              if (newTitle) {
+                                const { data, error } = await supabase.from('sermon_series').insert({ title: newTitle }).select().single();
+                                if (error) toast.error(error.message);
+                                else {
+                                  toast.success("Series created!");
+                                  setSeries([...series, data]);
+                                  setForm(f => ({ ...f, series_id: data.id }));
+                                }
+                              }
+                            }}
+                            className="text-primary font-bold"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create New Series
+                          </CommandItem>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4">

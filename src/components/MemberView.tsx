@@ -26,11 +26,19 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/src/lib/supabase";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
 import { motion } from "motion/react";
 import { useAuth } from "@/src/contexts/AuthContext";
 import SendEmailDialog from "./SendEmailDialog";
+import MemberForm from "./forms/MemberForm";
 
 interface MemberViewProps {
   member: any;
@@ -50,6 +58,7 @@ export default function MemberView({ member, onBack, canViewFinancials, canViewN
   const [isNoteAdding, setIsNoteAdding] = React.useState(false);
   const [emailDialog, setEmailDialog] = React.useState({ open: false, to: "", subject: "" });
   const [isLinking, setIsLinking] = React.useState<string | null>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
 
   const handleOpenEmail = () => {
     setEmailDialog({
@@ -297,12 +306,39 @@ export default function MemberView({ member, onBack, canViewFinancials, canViewN
             <Button variant="outline" className="flex-1 sm:flex-none rounded-2xl h-11 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 border-primary/20 hover:bg-primary/5">
               <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download Profile</span><span className="sm:hidden">Download</span>
             </Button>
-            <Button className="flex-1 sm:flex-none rounded-2xl h-11 px-8 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
+            <Button 
+              className="flex-1 sm:flex-none rounded-2xl h-11 px-8 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20"
+              onClick={() => setIsEditing(true)}
+            >
               <ShieldCheck className="w-4 h-4" /> Edit Profile
             </Button>
           </div>
         )}
       </div>
+
+      {/* Edit Member Dialog */}
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Member Profile</DialogTitle>
+            <DialogDescription>Update the details for {member.first_name} {member.last_name}.</DialogDescription>
+          </DialogHeader>
+          <MemberForm 
+            initialData={member}
+            onSuccess={() => {
+              setIsEditing(false);
+              toast.success("Profile updated successfully");
+              // Refreshing local state would be good, but we rely on parent to pass new member or re-fetch
+              // Since member is passed as prop, we might need a way to refresh it.
+              // For now, re-triggering fetchData in useEffect (which is already bound to member.id)
+              // But member prop itself won't change unless the parent refreshes.
+              // Let's reload the page or trigger a parent refresh if available.
+              window.location.reload(); 
+            }} 
+            onCancel={() => setIsEditing(false)} 
+          />
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Stats & Info */}

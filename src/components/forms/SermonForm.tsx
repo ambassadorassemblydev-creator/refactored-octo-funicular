@@ -21,10 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/src/lib/utils";
 import { supabase } from "@/src/lib/supabase";
 import { toast } from "sonner";
-import { Loader2, Plus } from "lucide-react";
 import { ImageUpload } from "@/src/components/ui/ImageUpload";
 
 const sermonSchema = z.object({
@@ -50,7 +53,7 @@ interface SermonFormProps {
 export default function SermonForm({ initialData, onSuccess, onCancel }: SermonFormProps) {
   const [loading, setLoading] = React.useState(false);
   const [series, setSeries] = React.useState<any[]>([]);
-
+  const [speakers, setSpeakers] = React.useState<any[]>([]);
   const [isSeriesDialogOpen, setIsSeriesDialogOpen] = React.useState(false);
   const [newSeriesTitle, setNewSeriesTitle] = React.useState("");
   const [creatingSeries, setCreatingSeries] = React.useState(false);
@@ -75,13 +78,17 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
     },
   });
 
-  const fetchSeries = async () => {
-    const { data } = await supabase.from('sermon_series').select('id, title');
-    setSeries(data || []);
+  const fetchData = async () => {
+    const [seriesRes, speakersRes] = await Promise.all([
+      supabase.from('sermon_series').select('id, title'),
+      supabase.from('sermon_speakers').select('id, name')
+    ]);
+    setSeries(seriesRes.data || []);
+    setSpeakers(speakersRes.data || []);
   };
 
   React.useEffect(() => {
-    fetchSeries();
+    fetchData();
   }, []);
 
   const handleCreateSeries = async () => {
@@ -187,11 +194,61 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
             control={form.control}
             name="speaker_name"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Speaker</FormLabel>
-                <FormControl>
-                  <Input placeholder="Pastor John Doe" {...field} />
-                </FormControl>
+              <FormItem className="flex flex-col">
+                <FormLabel className="mb-1">Speaker</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className={cn(
+                          "w-full justify-between font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value || "Select speaker..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search or type speaker..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start text-primary font-bold text-xs h-8"
+                            onClick={() => {
+                              const searchInput = document.querySelector('[placeholder="Search or type speaker..."]') as HTMLInputElement;
+                              if (searchInput?.value) {
+                                field.onChange(searchInput.value);
+                              }
+                            }}
+                          >
+                            <Plus className="mr-2 h-3 w-3" />
+                            Add as new speaker
+                          </Button>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {speakers.map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={s.name}
+                              onSelect={() => {
+                                field.onChange(s.name);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", field.value === s.name ? "opacity-100" : "opacity-0")} />
+                              {s.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
@@ -215,32 +272,64 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
           control={form.control}
           name="series_id"
           render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center justify-between">
-                <FormLabel>Sermon Series</FormLabel>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80"
-                  onClick={() => setIsSeriesDialogOpen(true)}
-                >
-                  <Plus className="w-3 h-3 mr-1" /> Add New Series
-                </Button>
-              </div>
-              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a series" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="none">Standalone / No Series</SelectItem>
-                  {series.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <FormItem className="flex flex-col">
+              <FormLabel className="mb-1">Sermon Series</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value && field.value !== "none"
+                        ? series.find((s) => s.id === field.value)?.title
+                        : "Select series..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search series..." />
+                    <CommandList>
+                      <CommandEmpty>No series found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => field.onChange("none")}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", field.value === "none" ? "opacity-100" : "opacity-0")} />
+                          Standalone / No Series
+                        </CommandItem>
+                        {series.map((s) => (
+                          <CommandItem
+                            key={s.id}
+                            value={s.title}
+                            onSelect={() => field.onChange(s.id)}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", field.value === s.id ? "opacity-100" : "opacity-0")} />
+                            {s.title}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandSeparator />
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => setIsSeriesDialogOpen(true)}
+                          className="text-primary font-bold"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Create New Series
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <FormMessage />
             </FormItem>
           )}
