@@ -172,8 +172,8 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
         if (buildingFundData) {
           setActiveGoal({
             title: buildingFundData.name,
-            target_amount: parseFloat(buildingFundData.goal_amount || "0"),
-            current_amount: parseFloat(buildingFundData.current_amount || "0")
+            target_amount: Number(buildingFundData.goal_amount || 0),
+            current_amount: Number(buildingFundData.current_amount || 0)
           });
         }
 
@@ -514,10 +514,10 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
             </div>
           </CardHeader>
           <CardContent className="pl-2">
-            <div className="h-[350px] w-full min-h-[350px] relative">
-              {!loading ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.length > 0 ? chartData : []}>
+            <div className="h-[350px] w-full min-h-[350px] min-w-0 relative">
+              {!loading && chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
@@ -634,10 +634,10 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           <CardHeader>
             <CardTitle className="text-lg font-bold">Ministry Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center min-h-[200px] relative">
-            <div className="h-[200px] w-full">
-              {!loading ? (
-                <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="flex justify-center min-h-[200px] min-w-0 relative">
+            <div className="h-[200px] w-full min-w-0">
+              {!loading && ministryDistribution.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={ministryDistribution}

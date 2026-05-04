@@ -51,7 +51,6 @@ import { useAuth } from "@/src/contexts/AuthContext";
 export default function GivingGoals() {
   const { user, role } = useAuth();
   const [goals, setGoals] = React.useState<any[]>([]);
-  const [categories, setCategories] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   if (role !== 'admin' && role !== 'super_admin' && role !== 'pastor') {
@@ -70,36 +69,22 @@ export default function GivingGoals() {
   const [donorsLoading, setDonorsLoading] = React.useState(false);
 
   const [form, setForm] = React.useState({
-    title: "",
+    name: "",
     description: "",
-    target_amount: "",
-    start_date: "",
-    end_date: "",
-    category_id: "",
+    goal_amount: "",
+    deadline: "",
+    is_active: true,
+    show_progress: true,
+    is_building_fund: false,
   });
   const [saving, setSaving] = React.useState(false);
-
-  const fetchCategories = async () => {
-    try {
-      const { data } = await supabase
-        .from("donation_categories")
-        .select("id, name, slug")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-      setCategories(data || []);
-      if (data && data.length > 0 && !form.category_id) {
-        setForm(p => ({ ...p, category_id: data[0].id }));
-      }
-    } catch (err) {
-      console.error("Error fetching categories:", err);
-    }
-  };
 
   const fetchGoals = async () => {
     setLoading(true);
     try {
+      // Fetch all active categories that have a goal amount or show progress
       const { data, error } = await supabase
-        .from("giving_goals" as any)
+        .from("donation_categories")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -113,7 +98,6 @@ export default function GivingGoals() {
 
   React.useEffect(() => {
     fetchGoals();
-    fetchCategories();
   }, []);
 
   const fetchDonors = async (goal: any) => {
@@ -123,7 +107,7 @@ export default function GivingGoals() {
       const { data } = await supabase
         .from("donations")
         .select("*")
-        .eq("category_id", goal.category_id)
+        .eq("category_id", goal.id)
         .order("created_at", { ascending: false });
       setDonors(data || []);
     } catch (err) {
@@ -141,49 +125,69 @@ export default function GivingGoals() {
   const openEdit = (goal: any) => {
     setEditingGoal(goal);
     setForm({
-      title: goal.title || "",
+      name: goal.name || "",
       description: goal.description || "",
-      target_amount: goal.target_amount?.toString() || "",
-      start_date: goal.start_date || "",
-      end_date: goal.end_date || "",
-      category_id: goal.category_id || "",
+      goal_amount: goal.goal_amount?.toString() || "",
+      deadline: goal.deadline || "",
+      is_active: goal.is_active ?? true,
+      show_progress: goal.show_progress ?? true,
+      is_building_fund: goal.is_building_fund ?? false,
     });
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", target_amount: "", start_date: "", end_date: "", category_id: categories[0]?.id || "" });
+    setForm({ 
+      name: "", 
+      description: "", 
+      goal_amount: "", 
+      deadline: "", 
+      is_active: true, 
+      show_progress: true,
+      is_building_fund: false 
+    });
     setEditingGoal(null);
     setIsCreateOpen(false);
   };
 
+  const generateSlug = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/[^\w ]+/g, '')
+      .replace(/ +/g, '-');
+  };
+
   const handleSave = async () => {
-    if (!form.title || !form.target_amount) {
-      toast.error("Title and target amount are required");
+    if (!form.name || !form.goal_amount) {
+      toast.error("Name and goal amount are required");
       return;
     }
     setSaving(true);
     try {
       const payload: any = {
-        title: form.title,
+        name: form.name,
         description: form.description || null,
-        target_amount: parseFloat(form.target_amount),
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
-        category_id: form.category_id,
-        is_active: true,
+        goal_amount: parseFloat(form.goal_amount),
+        deadline: form.deadline || null,
+        is_active: form.is_active,
+        show_progress: form.show_progress,
+        is_building_fund: form.is_building_fund,
+        updated_at: new Date().toISOString()
       };
 
       if (editingGoal) {
-        const { error } = await (supabase.from("giving_goals" as any) as any)
+        const { error } = await supabase
+          .from("donation_categories")
           .update(payload)
           .eq("id", editingGoal.id);
         if (error) throw error;
-        toast.success("Goal updated ✅");
+        toast.success("Campaign updated ✅");
       } else {
-        payload.created_by = user?.id;
-        const { error } = await (supabase.from("giving_goals" as any) as any).insert(payload);
+        payload.slug = generateSlug(form.name);
+        const { error } = await supabase
+          .from("donation_categories")
+          .insert(payload);
         if (error) throw error;
-        toast.success("Goal created 🎯");
+        toast.success("Campaign created 🎯");
       }
       resetForm();
       fetchGoals();
@@ -195,43 +199,43 @@ export default function GivingGoals() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this giving goal?")) return;
-    const { error } = await (supabase.from("giving_goals" as any) as any).delete().eq("id", id);
+    if (!confirm("Delete this donation campaign? This may affect existing donations.")) return;
+    const { error } = await supabase.from("donation_categories").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Goal deleted");
+    toast.success("Campaign deleted");
     fetchGoals();
   };
 
-  const totalRaised = goals.reduce((s, g) => s + (g.current_amount || 0), 0);
-  const active = goals.filter(g => g.is_active).length;
-  const completed = goals.filter(g => (g.current_amount || 0) >= (g.target_amount || 1)).length;
+  const totalRaised = goals.reduce((s, g) => s + (Number(g.current_amount) || 0), 0);
+  const activeCount = goals.filter(g => g.is_active).length;
+  const completedCount = goals.filter(g => (Number(g.current_amount) || 0) >= (Number(g.goal_amount) || 1)).length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20">
-            <Target className="w-7 h-7 text-primary-foreground" />
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-xl shadow-emerald-500/20">
+            <Target className="w-7 h-7 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-black tracking-tighter">Giving Goals</h1>
-            <p className="text-muted-foreground text-sm font-medium">Track fundraising campaigns and see who's contributing.</p>
+            <h1 className="text-3xl font-black tracking-tighter">Fundraising Campaigns</h1>
+            <p className="text-muted-foreground text-sm font-medium">Manage giving goals from donation categories.</p>
           </div>
         </div>
         <Button
           onClick={() => setIsCreateOpen(true)}
-          className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20"
+          className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white"
         >
-          <Plus className="w-4 h-4" /> New Goal
+          <Plus className="w-4 h-4" /> New Campaign
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid sm:grid-cols-3 gap-4">
         {[
-          { label: "Total Raised", value: `₦${totalRaised.toLocaleString()}`, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
-          { label: "Active Campaigns", value: active, icon: Activity, color: "text-amber-600", bg: "bg-amber-500/10" },
-          { label: "Goals Completed", value: completed, icon: Heart, color: "text-purple-600", bg: "bg-purple-500/10" },
+          { label: "Total Collected", value: `₦${totalRaised.toLocaleString()}`, icon: Heart, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+          { label: "Active Campaigns", value: activeCount, icon: Activity, color: "text-blue-500", bg: "bg-blue-500/10" },
+          { label: "Goals Met", value: completedCount, icon: TrendingUp, color: "text-purple-500", bg: "bg-purple-500/10" },
         ].map(stat => (
           <Card key={stat.label} className="border-none shadow-xl bg-card/50 backdrop-blur-xl rounded-3xl p-6">
             <div className="flex items-center justify-between mb-3">
@@ -255,15 +259,18 @@ export default function GivingGoals() {
           <div className="col-span-full py-20 text-center space-y-4 bg-muted/20 rounded-3xl border-2 border-dashed">
             <Target className="w-14 h-14 text-muted-foreground mx-auto opacity-40" />
             <div>
-              <h3 className="font-bold text-xl">No giving goals yet</h3>
-              <p className="text-muted-foreground text-sm">Create your first campaign to start tracking progress.</p>
+              <h3 className="font-bold text-xl">No campaigns yet</h3>
+              <p className="text-muted-foreground text-sm">Create your first donation category to start tracking goals.</p>
             </div>
             <Button onClick={() => setIsCreateOpen(true)} className="rounded-xl mt-2">
-              <Plus className="w-4 h-4 mr-2" /> Create First Goal
+              <Plus className="w-4 h-4 mr-2" /> Create First Campaign
             </Button>
           </div>
         ) : goals.map((goal) => {
-          const pct = Math.min(100, Math.round(((goal.current_amount || 0) / (goal.target_amount || 1)) * 100));
+          const current = Number(goal.current_amount || 0);
+          const target = Number(goal.goal_amount || 0);
+          const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+          
           return (
             <motion.div
               key={goal.id}
@@ -273,20 +280,27 @@ export default function GivingGoals() {
             >
               <div className="flex items-start justify-between mb-5">
                 <div className="space-y-1.5">
-                  {goal.end_date && (
+                  {goal.deadline && (
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                       <Calendar className="w-3 h-3" />
-                      Ends {new Date(goal.end_date).toLocaleDateString()}
+                      Deadline: {new Date(goal.deadline).toLocaleDateString()}
                     </div>
                   )}
-                  <h3 className="text-lg font-black tracking-tight">{goal.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black tracking-tight">{goal.name}</h3>
+                    {goal.is_building_fund && (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border-none text-[8px] font-bold uppercase tracking-widest">
+                        Building Fund
+                      </Badge>
+                    )}
+                  </div>
                   {goal.description && (
                     <p className="text-sm text-muted-foreground line-clamp-2">{goal.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={`text-[9px] font-bold border-none ${goal.is_active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-                    {goal.is_active ? 'ACTIVE' : 'CLOSED'}
+                    {goal.is_active ? 'ACTIVE' : 'INACTIVE'}
                   </Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-muted outline-none">
@@ -297,7 +311,7 @@ export default function GivingGoals() {
                         <Eye className="w-4 h-4 mr-2" /> See Donors
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openEdit(goal)}>
-                        <Edit2 className="w-4 h-4 mr-2" /> Edit Goal
+                        <Edit2 className="w-4 h-4 mr-2" /> Edit Campaign
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:bg-destructive focus:text-destructive-foreground" onClick={() => handleDelete(goal.id)}>
@@ -311,19 +325,19 @@ export default function GivingGoals() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-muted-foreground uppercase tracking-widest">Progress</span>
-                  <span className="text-primary">{pct}%</span>
+                  <span className="text-emerald-600">{pct}%</span>
                 </div>
                 <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ duration: 1.2, ease: "easeOut" }}
-                    className="h-full bg-primary rounded-full"
+                    className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]"
                   />
                 </div>
                 <div className="flex items-center justify-between text-sm font-bold">
-                  <span>₦{(goal.current_amount || 0).toLocaleString()}</span>
-                  <span className="text-muted-foreground">of ₦{(goal.target_amount || 0).toLocaleString()}</span>
+                  <span>₦{current.toLocaleString()}</span>
+                  <span className="text-muted-foreground">of ₦{target.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -331,9 +345,9 @@ export default function GivingGoals() {
                 variant="ghost"
                 size="sm"
                 onClick={() => openDonors(goal)}
-                className="w-full mt-4 rounded-xl h-9 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/10 hover:text-primary justify-between group/btn"
+                className="w-full mt-4 rounded-xl h-9 text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500/10 hover:text-emerald-600 justify-between group/btn"
               >
-                <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> View Donors</span>
+                <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> View Contributions</span>
                 <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
               </Button>
             </motion.div>
@@ -345,15 +359,15 @@ export default function GivingGoals() {
       <Dialog open={isCreateOpen || !!editingGoal} onOpenChange={open => !open && resetForm()}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingGoal ? "Edit Goal" : "Create Giving Goal"}</DialogTitle>
-            <DialogDescription>Set a fundraising target for a campaign or project.</DialogDescription>
+            <DialogTitle>{editingGoal ? "Edit Campaign" : "Create Campaign"}</DialogTitle>
+            <DialogDescription>Manage donation categories and their fundraising goals.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Title *</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Campaign Name *</label>
               <Input
-                value={form.title}
-                onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                 placeholder="e.g. Building Fund 2025"
                 className="rounded-xl h-11 bg-muted/30 border-none"
               />
@@ -363,58 +377,76 @@ export default function GivingGoals() {
               <Textarea
                 value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                placeholder="What is this goal for?"
+                placeholder="What is this campaign for?"
                 className="rounded-xl bg-muted/30 border-none resize-none min-h-[80px]"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Link to Fund Category *</label>
-              <Select value={form.category_id} onValueChange={(v: string) => setForm(p => ({ ...p, category_id: v }))}>
-                <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[9px] text-muted-foreground italic">Contributions to this category will automatically count towards this goal.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Goal Amount (₦) *</label>
+                <Input
+                  type="number"
+                  value={form.goal_amount}
+                  onChange={e => setForm(p => ({ ...p, goal_amount: e.target.value }))}
+                  placeholder="e.g. 5000000"
+                  className="rounded-xl h-11 bg-muted/30 border-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Deadline</label>
+                <Input
+                  type="date"
+                  value={form.deadline}
+                  onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
+                  className="rounded-xl h-11 bg-muted/30 border-none"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Target Amount (₦) *</label>
-              <Input
-                type="number"
-                value={form.target_amount}
-                onChange={e => setForm(p => ({ ...p, target_amount: e.target.value }))}
-                placeholder="e.g. 5000000"
-                className="rounded-xl h-11 bg-muted/30 border-none"
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Active</p>
+                  <p className="text-[8px] text-muted-foreground">Accepting donations</p>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={form.is_active} 
+                  onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))}
+                  className="accent-emerald-500"
+                />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Progress</p>
+                  <p className="text-[8px] text-muted-foreground">Show progress bar</p>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={form.show_progress} 
+                  onChange={e => setForm(p => ({ ...p, show_progress: e.target.checked }))}
+                  className="accent-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Building Fund</p>
+                <p className="text-[8px] text-emerald-600/70">Main dashboard featured goal</p>
+              </div>
+              <input 
+                type="checkbox" 
+                checked={form.is_building_fund} 
+                onChange={e => setForm(p => ({ ...p, is_building_fund: e.target.checked }))}
+                className="accent-emerald-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Start Date</label>
-                <Input
-                  type="date"
-                  value={form.start_date}
-                  onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-                  className="rounded-xl h-11 bg-muted/30 border-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">End Date</label>
-                <Input
-                  type="date"
-                  value={form.end_date}
-                  onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
-                  className="rounded-xl h-11 bg-muted/30 border-none"
-                />
-              </div>
-            </div>
+
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="ghost" onClick={resetForm} className="rounded-xl h-11">Cancel</Button>
-              <Button onClick={handleSave} disabled={saving} className="rounded-xl h-11 px-8 shadow-lg shadow-primary/20">
-                {saving ? "Saving..." : editingGoal ? "Update Goal" : "Create Goal"}
+              <Button onClick={handleSave} disabled={saving} className="rounded-xl h-11 px-8 shadow-lg shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white">
+                {saving ? "Saving..." : editingGoal ? "Update Campaign" : "Create Campaign"}
               </Button>
             </div>
           </div>
@@ -426,11 +458,11 @@ export default function GivingGoals() {
         <DialogContent className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-primary" />
-              Donors — {viewingDonors?.title}
+              <Heart className="w-5 h-5 text-emerald-500" />
+              Contributions — {viewingDonors?.name}
             </DialogTitle>
             <DialogDescription>
-              {donorsLoading ? "Loading..." : `${donors.length} contribution${donors.length !== 1 ? 's' : ''} recorded`}
+              {donorsLoading ? "Loading..." : `${donors.length} transaction${donors.length !== 1 ? 's' : ''} recorded`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-2">
@@ -439,12 +471,12 @@ export default function GivingGoals() {
             ) : donors.length === 0 ? (
               <div className="py-14 text-center space-y-3">
                 <CreditCard className="w-12 h-12 text-muted-foreground mx-auto opacity-30" />
-                <p className="text-muted-foreground font-semibold">No donations recorded for this goal yet</p>
-                <p className="text-xs text-muted-foreground">Donations are matched by the linked category: <span className="font-bold text-primary uppercase tracking-tighter">{categories.find(c => c.id === viewingDonors?.category_id)?.name || 'Unknown'}</span></p>
+                <p className="text-muted-foreground font-semibold">No donations recorded yet</p>
+                <p className="text-xs text-muted-foreground">Transactions are pulled from the <span className="font-bold text-emerald-600 uppercase tracking-tighter">{viewingDonors?.name}</span> category.</p>
               </div>
             ) : donors.map((d: any) => (
               <div key={d.id} className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border/40">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold text-primary text-sm">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 font-bold text-emerald-600 text-sm">
                   {(d.donor_name || d.donor_email || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -452,7 +484,7 @@ export default function GivingGoals() {
                   <p className="text-xs text-muted-foreground">{d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-black text-primary">₦{(d.amount || 0).toLocaleString()}</p>
+                  <p className="font-black text-emerald-600">₦{(d.amount || 0).toLocaleString()}</p>
                   <Badge className={`text-[9px] border-none ${d.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
                     {d.status}
                   </Badge>

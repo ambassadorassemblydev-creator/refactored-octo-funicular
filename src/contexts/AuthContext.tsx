@@ -34,6 +34,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = React.useState(true);
   const [isRoleResolving, setIsRoleResolving] = React.useState(false);
 
+  // Refs to track state for the onAuthStateChange listener closure
+  const userRef = React.useRef<User | null>(null);
+  const roleRef = React.useRef<Role | null>(null);
+  const loadingRef = React.useRef<boolean>(true);
+
+  // Sync refs with state
+  React.useEffect(() => { userRef.current = user; }, [user]);
+  React.useEffect(() => { roleRef.current = role; }, [role]);
+  React.useEffect(() => { loadingRef.current = loading; }, [loading]);
+
   const fetchProfileAndRole = async (userId: string, authUser: User) => {
     try {
       const { data, error } = await supabase
@@ -92,20 +102,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log(`[Auth] State Change: ${event}`);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (authEvent, newSession) => {
+      console.log(`[Auth] State Change: ${authEvent}`);
       if (!mounted) return;
 
-      if (event === 'TOKEN_REFRESHED') return;
+      if (authEvent === 'TOKEN_REFRESHED') return;
 
       setSession(newSession);
-      setUser(newSession?.user ?? null);
+      const newUser = newSession?.user ?? null;
+      
+      // Optimization: Only re-resolve role if the user ID actually changed
+      // This prevents "reloading" flickers during background token refreshes
+      const userIdChanged = newUser?.id !== userRef.current?.id;
+      const needsRoleResolution = userIdChanged || !roleRef.current;
+
+      setUser(newUser);
 
       const changeTimeoutId = setTimeout(() => {
-        if (mounted && isRoleResolving) {
-          console.warn('[Auth] Auth change resolve safety timeout reached.');
+        if (mounted) {
           setIsRoleResolving(false);
-          if (!role && newSession?.user) {
+          if (!roleRef.current && newSession?.user) {
+            console.warn('[Auth] Auth change resolve safety timeout reached.');
             const metaRole = newSession.user.user_metadata?.role || newSession.user.user_metadata?.role_claim;
             if (metaRole) setRole(metaRole as Role);
             else setRole('member');
@@ -114,9 +131,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }, 8000);
 
       try {
-        if (newSession?.user) {
-          setIsRoleResolving(true);
-          await fetchProfileAndRole(newSession.user.id, newSession.user);
+        if (newUser) {
+          if (needsRoleResolution) {
+            setIsRoleResolving(true);
+            await fetchProfileAndRole(newUser.id, newUser);
+          }
         } else {
           setRole(null);
           setProfile(null);
@@ -126,7 +145,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } finally {
         if (mounted) {
           setIsRoleResolving(false);
-          setLoading(false); // High IQ: First event (INITIAL_SESSION) resolves initial loading
+          // Only stop loading if we haven't already finished initialization
+          if (loadingRef.current) setLoading(false);
         }
         clearTimeout(changeTimeoutId);
       }
