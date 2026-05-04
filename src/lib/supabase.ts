@@ -17,7 +17,12 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
-      storageKey: 'ambassadors-admin-secure-session',
+      storageKey: 'ambassadors-admin-isolated-v2',
+      storage: {
+        getItem: (key) => window.localStorage.getItem(key),
+        setItem: (key, value) => window.localStorage.setItem(key, value),
+        removeItem: (key) => window.localStorage.removeItem(key),
+      }
     }
   }
 );
