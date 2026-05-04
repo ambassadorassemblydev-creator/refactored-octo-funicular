@@ -126,6 +126,7 @@ export default function ApprovalsCenter() {
   });
   const [roles, setRoles] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
+  const [positions, setPositions] = React.useState<any[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -138,7 +139,8 @@ export default function ApprovalsCenter() {
         { data: prayers },
         { data: outreach },
         { data: rData },
-        { data: dData }
+        { data: dData },
+        { data: pData }
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('already_serving', true).eq('approval_status', 'pending'),
         supabase.from('volunteer_applications').select('*, church_departments(name), church_positions(title)').eq('status', 'pending'),
@@ -147,7 +149,8 @@ export default function ApprovalsCenter() {
         supabase.from('prayer_requests').select('id, title, description, requester_name, requester_email, created_at, is_urgent, category, recaptcha_score, is_public').eq('is_approved', false).is('approved_at', null),
         supabase.from('event_registrations').select('*, events!inner(*), profiles:profiles!event_registrations_user_id_fkey(*)').eq('is_confirmed', false).eq('events.event_type', 'outreach'),
         supabase.from('roles').select('id, name'),
-        supabase.from('church_departments').select('id, name')
+        supabase.from('church_departments').select('id, name'),
+        supabase.from('church_positions').select('id, title')
       ]);
 
       setData({
@@ -160,6 +163,7 @@ export default function ApprovalsCenter() {
       });
       setRoles(rData || []);
       setDepartments(dData || []);
+      setPositions(pData || []);
     } catch (error: any) {
       console.error("Fetch Data Error:", error);
       toast.error("Failed to load approval items");
@@ -246,9 +250,15 @@ export default function ApprovalsCenter() {
             );
             
             if (matchedDept) {
+              const matchedPos = positions.find(p => 
+                p.title.toLowerCase().includes(record.position_interest?.toLowerCase()) ||
+                record.position_interest?.toLowerCase().includes(p.title.toLowerCase())
+              );
+
               await (supabase.from('church_workers') as any).upsert({
                 user_id: id,
                 department_id: matchedDept.id,
+                position_id: matchedPos?.id || null,
                 status: 'active'
               }, { onConflict: 'user_id' });
             }
@@ -295,7 +305,7 @@ export default function ApprovalsCenter() {
         </div>
         <p className="text-muted-foreground font-medium max-w-2xl">
           Central hub for all pending administrative actions. Review staff verifications, 
-          volunteer applications, ministry joins, and community content.
+          volunteer applications, ministry joins, and community outreach.
         </p>
       </div>
 

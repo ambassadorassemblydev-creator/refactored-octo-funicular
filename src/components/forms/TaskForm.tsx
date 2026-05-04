@@ -166,11 +166,11 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
                 <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Department</FormLabel>
                 <Select onValueChange={(v) => { field.onChange(v); form.setValue("assignee", ""); }} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none">
-                      <SelectValue placeholder="All Departments" />
+                    <SelectTrigger className="rounded-xl h-11 bg-muted/30 border-none w-full overflow-hidden">
+                      <SelectValue placeholder="All Departments" className="truncate max-w-[150px]" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="rounded-xl max-h-[300px]">
                     <SelectItem value="all_depts">All Departments</SelectItem>
                     {departments.map((d: any) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -199,7 +199,9 @@ export default function TaskForm({ initialData, workers, departments = [], onSub
                       <div className="px-3 py-2 text-xs text-muted-foreground text-center">No workers found</div>
                     ) : filteredWorkers.map((worker) => (
                       <SelectItem key={worker.id} value={worker.user_id}>
-                        {worker.profiles?.first_name} {worker.profiles?.last_name}
+                        {worker.profiles?.first_name || worker.profiles?.last_name 
+                          ? `${worker.profiles?.first_name || ''} ${worker.profiles?.last_name || ''}`.trim()
+                          : `Worker (${worker.user_id.substring(0, 8)}...)`}
                       </SelectItem>
                     ))}
                   </SelectContent>

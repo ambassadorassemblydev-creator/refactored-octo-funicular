@@ -355,6 +355,26 @@ export default function Attendance() {
         </div>
       </div>
 
+      {selectedEvent === 'sunday_service' && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-start gap-4"
+        >
+          <div className="bg-primary/20 p-2 rounded-full">
+            <CheckCircle2 className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h4 className="font-bold text-primary text-sm uppercase tracking-wider">Sunday Service Guidance</h4>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              You are currently marking attendance for the <strong>Main Sunday Service</strong>. 
+              Ensure you have scanned the entrance QR code for the correct date. 
+              Use "Mark All Present" only if the majority of the roster is physically in the building.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-emerald-500/5 border-emerald-500/10 rounded-2xl border-none shadow-sm">
           <CardContent className="p-4">

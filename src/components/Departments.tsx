@@ -448,7 +448,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Outreach Team</DialogTitle>
-              <DialogDescription>Update the details for this department.</DialogDescription>
+              <DialogDescription>Update the details for this outreach team.</DialogDescription>
             </DialogHeader>
             {editingDepartment && (
               <DepartmentForm
@@ -472,7 +472,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Outreach & Community Impact</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Community Outreach & Impact</h1>
           <p className="text-muted-foreground">Teams and initiatives dedicated to church outreach and community transformation.</p>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -534,7 +534,7 @@ export default function Departments({ onTabChange }: { onTabChange?: (tab: strin
           <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto">
             <Building2 className="w-10 h-10 text-muted-foreground/30" />
           </div>
-          <h3 className="font-bold text-xl text-muted-foreground">No departments found</h3>
+          <h3 className="font-bold text-xl text-muted-foreground">No outreach teams found</h3>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

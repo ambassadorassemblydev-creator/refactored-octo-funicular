@@ -73,13 +73,13 @@ export default function DepartmentForm({ initialData, onSuccess, onCancel }: Dep
           .update(values)
           .eq("id", initialData.id);
         if (error) throw error;
-        toast.success("Department updated successfully");
+        toast.success("Outreach team updated successfully");
       } else {
         const { error } = await supabase
           .from("church_departments")
           .insert([values]);
         if (error) throw error;
-        toast.success("Department created successfully");
+        toast.success("Outreach team created successfully");
       }
       onSuccess();
     } catch (error: any) {
@@ -97,7 +97,7 @@ export default function DepartmentForm({ initialData, onSuccess, onCancel }: Dep
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Department Name</FormLabel>
+              <FormLabel>Outreach Team Name</FormLabel>
               <FormControl>
                 <Input placeholder="Media, Finance, Logistics..." {...field} />
               </FormControl>
@@ -113,7 +113,7 @@ export default function DepartmentForm({ initialData, onSuccess, onCancel }: Dep
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea placeholder="What is the purpose of this department?" {...field} />
+                <Textarea placeholder="What is the purpose of this outreach team?" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -126,7 +126,7 @@ export default function DepartmentForm({ initialData, onSuccess, onCancel }: Dep
             name="head_id"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Department Head</FormLabel>
+                <FormLabel>Team Lead</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -187,7 +187,7 @@ export default function DepartmentForm({ initialData, onSuccess, onCancel }: Dep
           </Button>
           <Button type="submit" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {initialData ? "Update Department" : "Create Department"}
+            {initialData ? "Update Outreach Team" : "Create Outreach Team"}
           </Button>
         </div>
       </form>

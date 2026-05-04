@@ -40,11 +40,11 @@ interface Props {
 
 export default function MemberAssignmentDialog({ member, open, onOpenChange, onSuccess }: Props) {
   const [loading, setLoading] = React.useState(false);
+  const [dataLoading, setDataLoading] = React.useState(true);
   const [roles, setRoles] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [ministries, setMinistries] = React.useState<any[]>([]);
   const [positions, setPositions] = React.useState<any[]>([]);
-  const [userRoles, setUserRoles] = React.useState<any[]>([]);
   
   // Selection states
   const [selectedRole, setSelectedRole] = React.useState<string>("");
@@ -54,6 +54,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
   const [selectedPosition, setSelectedPosition] = React.useState<string>("");
 
   const fetchData = async () => {
+    setDataLoading(true);
     try {
       const [
         { data: rData },
@@ -94,6 +95,8 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -189,6 +192,19 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
     }
   };
 
+  const renderSelectValue = (value: string, items: any[], placeholder: string, labelKey: string = 'name') => {
+    if (dataLoading) return <div className="flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading...</div>;
+    if (!value || value === 'none') return placeholder;
+    const item = items.find(i => (i.id === value || i.name === value));
+    if (item) return item[labelKey] || item.name || item.title;
+    
+    // Safety check for ID bleed-through: if value is UUID-like but not found, truncate it
+    if (value.length > 20 && value.includes('-')) {
+        return <span className="text-muted-foreground italic">Unknown ({value.substring(0, 8)}...)</span>;
+    }
+    return value;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-[500px] rounded-3xl border-none shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -208,14 +224,16 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <Shield className="w-3 h-3" /> System Role (Access Level)
             </Label>
-            <Select value={selectedRole} onValueChange={v => v && setSelectedRole(v)}>
+            <Select value={selectedRole} onValueChange={v => v && setSelectedRole(v)} disabled={dataLoading}>
               <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
-                <SelectValue placeholder="Select access level" />
+                <SelectValue placeholder="Select access level">
+                    {renderSelectValue(selectedRole, roles, "Select access level")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
                 {roles.map(r => (
                   <SelectItem key={r.id} value={r.name} className="rounded-xl uppercase text-[10px] font-bold tracking-widest">
-                    {r.name.replace('_', ' ')}
+                    {r.name?.replace('_', ' ')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -227,7 +245,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <Award className="w-3 h-3" /> Ecclesiastical Title
             </Label>
-            <Select value={selectedTitle} onValueChange={v => v && setSelectedTitle(v)}>
+            <Select value={selectedTitle} onValueChange={v => v && setSelectedTitle(v)} disabled={dataLoading}>
               <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
                 <SelectValue placeholder="Select title" />
               </SelectTrigger>
@@ -254,9 +272,11 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <Building2 className="w-3 h-3" /> Functional Department
             </Label>
-            <Select value={selectedDept} onValueChange={v => v && setSelectedDept(v)}>
+            <Select value={selectedDept} onValueChange={v => v && setSelectedDept(v)} disabled={dataLoading}>
               <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
-                <SelectValue placeholder="Assign to department" />
+                <SelectValue placeholder="Assign to department">
+                    {renderSelectValue(selectedDept, departments, "Assign to department")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
                 <SelectItem value="none" className="rounded-xl italic">No Assignment</SelectItem>
@@ -275,9 +295,11 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Users className="w-3 h-3" /> Role within Department
               </Label>
-              <Select value={selectedPosition} onValueChange={v => v && setSelectedPosition(v)}>
+              <Select value={selectedPosition} onValueChange={v => v && setSelectedPosition(v)} disabled={dataLoading}>
                 <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
-                  <SelectValue placeholder="Select specific role" />
+                  <SelectValue placeholder="Select specific role">
+                    {renderSelectValue(selectedPosition, positions, "Select specific role", 'title')}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-xl">
                   {positions.filter(p => p.department_id === selectedDept).map(p => (
@@ -295,9 +317,11 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <HeartHandshake className="w-3 h-3" /> Spiritual Ministry
             </Label>
-            <Select value={selectedMinistry} onValueChange={v => v && setSelectedMinistry(v)}>
+            <Select value={selectedMinistry} onValueChange={v => v && setSelectedMinistry(v)} disabled={dataLoading}>
               <SelectTrigger className="h-12 rounded-2xl bg-muted/30 border-none">
-                <SelectValue placeholder="Assign to ministry" />
+                <SelectValue placeholder="Assign to ministry">
+                    {renderSelectValue(selectedMinistry, ministries, "Assign to ministry")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
                 <SelectItem value="none" className="rounded-xl italic">No Assignment</SelectItem>
@@ -315,7 +339,7 @@ export default function MemberAssignmentDialog({ member, open, onOpenChange, onS
           <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-2xl h-12 font-bold uppercase tracking-widest text-[10px]">
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={loading} className="flex-1 rounded-2xl h-12 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
+          <Button onClick={handleSave} disabled={loading || dataLoading} className="flex-1 rounded-2xl h-12 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             Save Assignments
           </Button>
