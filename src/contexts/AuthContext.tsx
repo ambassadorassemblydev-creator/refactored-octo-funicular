@@ -153,9 +153,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setLoading(false);
           setIsRoleResolving(false);
           if (roleRef.current === null) {
-            const metadataRole = newUser.user_metadata?.role || newUser.user_metadata?.role_claim || 'member';
-            console.log(`[Auth] Using metadata fallback role: ${metadataRole}`);
-            setRole(metadataRole as Role);
+            const metadataRole = newUser.user_metadata?.role || newUser.user_metadata?.role_claim;
+            if (metadataRole) {
+              console.log(`[Auth] Using metadata fallback role: ${metadataRole}`);
+              setRole(metadataRole as Role);
+            } else {
+              console.warn('[Auth] No metadata fallback found. Staying on loading screen.');
+            }
           }
         }
       }, 5000);
