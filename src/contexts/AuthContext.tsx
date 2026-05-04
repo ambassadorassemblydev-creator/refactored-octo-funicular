@@ -99,10 +99,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return false;
   };
 
+  // Protection against rapid-fire auth events (like Clock Skew loops)
+  const lastFetchTimeRef = React.useRef<number>(0);
+
   React.useEffect(() => {
     let mounted = true;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (authEvent, newSession) => {
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTimeRef.current;
+      
       console.log(`[Auth] State Change: ${authEvent}`);
       if (!mounted) return;
 
@@ -120,22 +126,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(newSession);
       const newUser = newSession.user;
       
-      // Determine if this is a background update or a fresh login
+      // Determine if this is a background update or a fresh identity
       const isIdentityChange = newUser.id !== userRef.current?.id;
-      const isBackgroundRefresh = authEvent === 'TOKEN_REFRESHED';
       
-      setUser(newUser);
+      // If the user identity hasn't changed AND we just fetched recently (< 5s),
+      // ignore this event to prevent Clock Skew loops from slamming the DB.
+      if (!isIdentityChange && timeSinceLastFetch < 5000) {
+        console.log('[Auth] Ignoring rapid-fire redundant event.');
+        return;
+      }
 
-      // Only show the full-screen loading spinner if it's a new login or we don't have a role yet
-      const showLoadingSpinner = isIdentityChange || !roleRef.current;
+      setUser(newUser);
+      lastFetchTimeRef.current = now;
+
+      // ONLY show the global loading spinner if it's a completely different user
+      // or if we have literally NO role yet (first load ever)
+      const needsBlockingLoad = isIdentityChange || roleRef.current === null;
+
+      // Emergency timeout: If role resolution takes too long, force loading to end
+      const emergencyTimeoutId = setTimeout(() => {
+        if (mounted && loadingRef.current) {
+          console.warn('[Auth] Emergency timeout reached. Forcing loading to end.');
+          setLoading(false);
+          setIsRoleResolving(false);
+          if (roleRef.current === null) setRole('member');
+        }
+      }, 5000);
 
       try {
-        if (showLoadingSpinner) {
+        if (needsBlockingLoad) {
           setIsRoleResolving(true);
         }
 
-        // Always fetch profile and role to keep data fresh, 
-        // but only block the UI if necessary
+        // Fetch profile and role silently in the background
         await fetchProfileAndRole(newUser.id, newUser);
       } catch (err) {
         console.error('[Auth] Auth change error:', err);
@@ -144,6 +167,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setIsRoleResolving(false);
           if (loadingRef.current) setLoading(false);
         }
+        clearTimeout(emergencyTimeoutId);
       }
     });
 

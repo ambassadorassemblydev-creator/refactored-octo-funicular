@@ -168,8 +168,9 @@ function AppContent() {
   // ==========================================
   const { role, isRoleResolving } = useAuth();
   
-  // Still fetching role — show nothing extra, the main preloader handles it
-  if (isRoleResolving || role === null) {
+  // Only show the loader if we are resolving a role and DON'T already have one.
+  // This prevents background refreshes from flickering the screen.
+  if (role === null || (isRoleResolving && role === null)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />

@@ -309,10 +309,10 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && user) {
       fetchDashboardData();
     }
-  }, [user, authLoading]);
+  }, [user?.id, authLoading]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 relative">
