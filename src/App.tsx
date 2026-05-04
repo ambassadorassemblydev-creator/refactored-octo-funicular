@@ -164,24 +164,25 @@ function AppContent() {
   }
 
   // ==========================================
-  // RBAC GATEKEEPER (Simplified)
+  // SECURITY GATEKEEPER
   // ==========================================
   const { role, isRoleResolving } = useAuth();
   
-  // Only show the loader if we are resolving a role and DON'T already have one.
-  // This prevents background refreshes from flickering the screen.
-  if (role === null || (isRoleResolving && role === null)) {
+  // 1. If we are still actively checking the role, show the premium loader
+  if (isRoleResolving && role === null) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-        <p className="text-white/50 font-bold uppercase tracking-widest text-[10px]">Loading Dashboard...</p>
+        <p className="text-white/50 font-bold uppercase tracking-widest text-[10px]">Verifying Credentials...</p>
       </div>
     );
   }
 
-  const isAuthorized = ['super_admin', 'admin', 'pastor', 'leader'].includes(role);
+  // 2. Check authorization
+  const isAuthorized = ['super_admin', 'admin', 'pastor', 'leader'].includes(role || '');
 
-  if (!isAuthorized) {
+  // 3. Block unauthorized access (Members/Guests)
+  if (!isAuthorized && role !== null) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
         <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mb-8 ring-1 ring-red-500/20">

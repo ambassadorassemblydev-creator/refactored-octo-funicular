@@ -46,9 +46,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfileAndRole = async (userId: string, authUser: User) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('profiles')
-        .select('*')
+        .select('*') as any)
         .eq('id', userId)
         .maybeSingle();
 
@@ -59,15 +59,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (data) {
+        // Use an explicit cast to help TypeScript understand the data structure
+        const profileData = data as any;
+        
         // Set profile with avatar fallback
         setProfile({
-          ...data,
-          avatar_url: data.avatar_url || authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture,
-          full_name: authUser.user_metadata?.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim()
+          ...profileData,
+          avatar_url: profileData.avatar_url || authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture,
+          full_name: authUser.user_metadata?.full_name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim()
         });
 
         // Use role_claim as the single source of truth as requested
-        const userRole = (data.role_claim || 'member').toLowerCase().trim().replace(/\s+/g, '_') as Role;
+        const userRole = (profileData.role_claim || 'member').toLowerCase().trim().replace(/\s+/g, '_') as Role;
         console.log(`[Auth] Role resolved: ${userRole}`);
         
         setRole(userRole);
@@ -149,7 +152,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.warn('[Auth] Emergency timeout reached. Forcing loading to end.');
           setLoading(false);
           setIsRoleResolving(false);
-          if (roleRef.current === null) setRole('member');
+          if (roleRef.current === null) {
+            const metadataRole = newUser.user_metadata?.role || newUser.user_metadata?.role_claim || 'member';
+            console.log(`[Auth] Using metadata fallback role: ${metadataRole}`);
+            setRole(metadataRole as Role);
+          }
         }
       }, 5000);
 
