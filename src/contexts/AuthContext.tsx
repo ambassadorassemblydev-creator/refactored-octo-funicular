@@ -92,50 +92,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     let mounted = true;
 
-    const initAuth = async () => {
-      try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-
-        if (currentSession?.user) {
-          setSession(currentSession);
-          setUser(currentSession.user);
-          setIsRoleResolving(true);
-          await fetchProfileAndRole(currentSession.user.id, currentSession.user);
-        }
-      } catch (err) {
-        console.error('[Auth] Initialization error:', err);
-      } finally {
-        if (mounted) {
-          setIsRoleResolving(false);
-          setLoading(false);
-        }
-      }
-    };
-
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && (loading || isRoleResolving)) {
-        console.warn('[Auth] Initialization safety timeout reached. Forcing state resolution.');
-        
-        // High IQ Fallback: Try to get role from user metadata if DB fetch hung
-        if (!role && user) {
-          const metaRole = user.user_metadata?.role || user.user_metadata?.role_claim;
-          if (metaRole) {
-            console.log(`[Auth] Recovered role from metadata: ${metaRole}`);
-            setRole(metaRole as Role);
-          } else {
-            setRole('member');
-          }
-        }
-        
-        setIsRoleResolving(false);
-        setLoading(false);
-      }
-    }, 8000); // Increased to 8s to allow Supabase's 5s lock recovery to finish first
-
-    initAuth().finally(() => clearTimeout(safetyTimeout));
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log(`[Auth] State Change: ${event}`);
       if (!mounted) return;
@@ -168,7 +124,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('[Auth] Auth change error:', err);
       } finally {
-        if (mounted) setIsRoleResolving(false);
+        if (mounted) {
+          setIsRoleResolving(false);
+          setLoading(false); // High IQ: First event (INITIAL_SESSION) resolves initial loading
+        }
         clearTimeout(changeTimeoutId);
       }
     });

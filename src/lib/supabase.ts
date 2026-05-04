@@ -16,7 +16,7 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'ambassadors-assembly-auth-token',
+      storageKey: 'ambassadors-admin-secure-session',
     }
   }
 );

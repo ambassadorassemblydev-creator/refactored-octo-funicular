@@ -143,9 +143,9 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
     const fetchDashboardData = async (retries = 3) => {
       setLoading(true);
       const safetyTimeout = setTimeout(() => {
-        console.warn('[Dashboard] Data fetch timed out after 5s. Forcing ready.');
+        console.warn('[Dashboard] Data fetch timed out after 15s. Forcing ready.');
         setLoading(false);
-      }, 5000);
+      }, 15000);
 
       if (!user) {
         setLoading(false);
@@ -515,58 +515,64 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[350px] w-full min-h-[350px] relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData.length > 0 ? chartData : []}>
-                  <defs>
-                    <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: '16px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="attendance" 
-                    stroke="hsl(var(--primary))" 
-                    fillOpacity={1} 
-                    fill="url(#colorAttendance)" 
-                    strokeWidth={4}
-                    dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: '#fff' }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                  {(role === 'super_admin' || role === 'admin' || role === 'pastor') && (
+              {!loading ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData.length > 0 ? chartData : []}>
+                    <defs>
+                      <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '16px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
                     <Area 
                       type="monotone" 
-                      dataKey="giving" 
-                      stroke="hsl(var(--chart-2))" 
+                      dataKey="attendance" 
+                      stroke="hsl(var(--primary))" 
                       fillOpacity={1} 
-                      fill="url(#colorGiving)" 
+                      fill="url(#colorAttendance)" 
                       strokeWidth={4}
-                      dot={{ r: 4, fill: 'hsl(var(--chart-2))', strokeWidth: 2, stroke: '#fff' }}
+                      dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: '#fff' }}
                       activeDot={{ r: 6, strokeWidth: 0 }}
                     />
-                  )}
-                </AreaChart>
-              </ResponsiveContainer>
+                    {(role === 'super_admin' || role === 'admin' || role === 'pastor') && (
+                      <Area 
+                        type="monotone" 
+                        dataKey="giving" 
+                        stroke="hsl(var(--chart-2))" 
+                        fillOpacity={1} 
+                        fill="url(#colorGiving)" 
+                        strokeWidth={4}
+                        dot={{ r: 4, fill: 'hsl(var(--chart-2))', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 6, strokeWidth: 0 }}
+                      />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -630,24 +636,30 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           </CardHeader>
           <CardContent className="flex justify-center min-h-[200px] relative">
             <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={ministryDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {ministryDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {!loading ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={ministryDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {ministryDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-wrap gap-4 justify-center pb-6">
