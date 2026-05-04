@@ -44,8 +44,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       options: {
         redirectTo: window.location.origin,
         queryParams: {
-          prompt: 'select_account',
-          access_type: 'offline'
+          prompt: 'select_account'
         }
       }
     });

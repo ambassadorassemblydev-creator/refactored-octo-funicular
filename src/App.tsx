@@ -168,22 +168,12 @@ function AppContent() {
   // ==========================================
   const { role, isRoleResolving } = useAuth();
   
-  // 1. If we are still actively checking the role, show the premium loader
+  // 1. If we are still actively checking the role, show the loader
   if (isRoleResolving && role === null) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#010101] p-6 text-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-        <p className="text-white/50 font-bold uppercase tracking-widest text-[10px] mb-8">Verifying Credentials...</p>
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-both">
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="rounded-xl border-white/5 bg-white/5 hover:bg-white/10 text-[10px] uppercase tracking-widest font-bold"
-            onClick={() => window.location.reload()}
-          >
-            Retry Connection
-          </Button>
-        </div>
+        <p className="text-white/50 font-bold uppercase tracking-widest text-[10px]">Verifying Credentials...</p>
       </div>
     );
   }
