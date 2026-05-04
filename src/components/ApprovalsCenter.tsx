@@ -177,36 +177,55 @@ export default function ApprovalsCenter() {
       let table = "";
       let updateData: any = {};
 
+      const auditInfo = {
+        approved_by: user?.id,
+        approved_at: new Date().toISOString()
+      };
+
       switch (type) {
         case 'staff':
           table = 'profiles';
-          updateData = { approval_status: action === 'approve' ? 'approved' : 'rejected' };
+          updateData = { 
+            approval_status: action === 'approve' ? 'approved' : 'rejected',
+            ...auditInfo
+          };
           break;
         case 'volunteers':
           table = 'volunteer_applications';
-          updateData = { status: action === 'approve' ? 'approved' : 'rejected' };
+          updateData = { 
+            status: action === 'approve' ? 'approved' : 'rejected',
+            ...auditInfo
+          };
           break;
         case 'ministries':
           table = 'ministry_members';
-          updateData = { status: action === 'approve' ? 'active' : 'rejected', role: action === 'approve' ? 'member' : 'rejected' };
+          updateData = { 
+            status: action === 'approve' ? 'active' : 'rejected', 
+            role: action === 'approve' ? 'member' : 'rejected',
+            ...auditInfo
+          };
           break;
         case 'testimonies':
           table = 'testimonies';
           updateData = { 
             is_approved: action === 'approve',
-            status: action === 'approve' ? 'published' : 'archived'
+            status: action === 'approve' ? 'published' : 'archived',
+            ...auditInfo
           };
           break;
         case 'prayers':
           table = 'prayer_requests';
           updateData = { 
             is_approved: action === 'approve',
-            approved_at: action === 'approve' ? new Date().toISOString() : null
+            ...auditInfo
           };
           break;
         case 'outreach':
           table = 'event_registrations';
-          updateData = { is_confirmed: action === 'approve' };
+          updateData = { 
+            is_confirmed: action === 'approve',
+            ...auditInfo
+          };
           break;
       }
 
