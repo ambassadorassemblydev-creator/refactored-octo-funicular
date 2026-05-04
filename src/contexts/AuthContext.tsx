@@ -106,49 +106,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log(`[Auth] State Change: ${authEvent}`);
       if (!mounted) return;
 
-      if (authEvent === 'TOKEN_REFRESHED') return;
+      // Handle sign out immediately
+      if (!newSession?.user) {
+        setSession(null);
+        setUser(null);
+        setRole(null);
+        setProfile(null);
+        setLoading(false);
+        setIsRoleResolving(false);
+        return;
+      }
 
       setSession(newSession);
-      const newUser = newSession?.user ?? null;
+      const newUser = newSession.user;
       
-      // Optimization: Only re-resolve role if the user ID actually changed
-      // This prevents "reloading" flickers during background token refreshes
-      const userIdChanged = newUser?.id !== userRef.current?.id;
-      const needsRoleResolution = userIdChanged || !roleRef.current;
-
+      // Determine if this is a background update or a fresh login
+      const isIdentityChange = newUser.id !== userRef.current?.id;
+      const isBackgroundRefresh = authEvent === 'TOKEN_REFRESHED';
+      
       setUser(newUser);
 
-      const changeTimeoutId = setTimeout(() => {
-        if (mounted) {
-          setIsRoleResolving(false);
-          if (!roleRef.current && newSession?.user) {
-            console.warn('[Auth] Auth change resolve safety timeout reached.');
-            const metaRole = newSession.user.user_metadata?.role || newSession.user.user_metadata?.role_claim;
-            if (metaRole) setRole(metaRole as Role);
-            else setRole('member');
-          }
-        }
-      }, 8000);
+      // Only show the full-screen loading spinner if it's a new login or we don't have a role yet
+      const showLoadingSpinner = isIdentityChange || !roleRef.current;
 
       try {
-        if (newUser) {
-          if (needsRoleResolution) {
-            setIsRoleResolving(true);
-            await fetchProfileAndRole(newUser.id, newUser);
-          }
-        } else {
-          setRole(null);
-          setProfile(null);
+        if (showLoadingSpinner) {
+          setIsRoleResolving(true);
         }
+
+        // Always fetch profile and role to keep data fresh, 
+        // but only block the UI if necessary
+        await fetchProfileAndRole(newUser.id, newUser);
       } catch (err) {
         console.error('[Auth] Auth change error:', err);
       } finally {
         if (mounted) {
           setIsRoleResolving(false);
-          // Only stop loading if we haven't already finished initialization
           if (loadingRef.current) setLoading(false);
         }
-        clearTimeout(changeTimeoutId);
       }
     });
 
