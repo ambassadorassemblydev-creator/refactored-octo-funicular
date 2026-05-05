@@ -26,12 +26,9 @@ const AuthContext = React.createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
-// Clean auth params from URL IMMEDIATELY on load to prevent
-// Supabase from trying to re-exchange a used code on reload.
-// Also clean bare "#" left behind by the implicit OAuth flow.
-if (window.location.search.includes('code=') || window.location.hash) {
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
+// NOTE: Do NOT clean URL params here at module level.
+// Supabase needs to read #access_token or ?code= from the URL first.
+// Cleanup happens inside onAuthStateChange AFTER processing.
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = React.useState<Session | null>(null);
