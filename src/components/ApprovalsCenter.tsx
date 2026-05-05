@@ -16,6 +16,7 @@ import {
   Shield,
   FileText,
   HandHeart,
+  Heart,
   ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -235,7 +236,7 @@ export default function ApprovalsCenter() {
       const { error: updateError } = await supabase.from(table as any).update(updateData).eq('id', id);
       if (updateError) throw updateError;
 
-      if ((type === 'staff' || type === 'volunteers') && action === 'approve') {
+      if ((type === 'staff' || type === 'volunteers' || type === 'outreach') && action === 'approve') {
         if (type === 'staff') {
           const targetRole = record._selectedRole || 'worker';
           

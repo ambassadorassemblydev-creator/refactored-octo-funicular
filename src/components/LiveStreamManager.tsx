@@ -33,8 +33,8 @@ interface StreamForm {
   chat_enabled: boolean;
   notify_subscribers: boolean;
   status: string;
-  speaker_id?: string;
-  series_id?: string;
+  speaker_id?: string | null;
+  series_id?: string | null;
   scripture_reference?: string;
   scripture_text?: string;
 }
@@ -100,8 +100,8 @@ export default function LiveStreamManager() {
       chat_enabled: true, 
       notify_subscribers: true, 
       status: status, 
-      speaker_id: "", 
-      series_id: "", 
+      speaker_id: null, 
+      series_id: null, 
       scripture_reference: "", 
       scripture_text: "" 
     });
@@ -114,8 +114,8 @@ export default function LiveStreamManager() {
       ...s, 
       scheduled_start: s.scheduled_start ? new Date(s.scheduled_start).toISOString().slice(0, 16) : (statusOverride === "live" ? new Date().toISOString().slice(0, 16) : ""), 
       scheduled_end: s.scheduled_end ? new Date(s.scheduled_end).toISOString().slice(0, 16) : "",
-      speaker_id: s.speaker_id || "",
-      series_id: s.series_id || "",
+      speaker_id: s.speaker_id || null,
+      series_id: s.series_id || null,
       scripture_reference: s.scripture_reference || "",
       scripture_text: s.scripture_text || "",
       thumbnail_url: s.thumbnail_url || "",
@@ -195,7 +195,7 @@ export default function LiveStreamManager() {
     // High IQ: Auto-broadcast push notification if just went live
     if (isNewLive) {
       try {
-        await fetch(`${import.meta.env.VITE_MAIN_APP_URL || ''}/api/notifications/broadcast`, {
+        await fetch(`${import.meta.env.VITE_MAIN_APP_URL || 'https://theambassadorsassembly.org'}/api/notifications/broadcast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -509,7 +509,7 @@ export default function LiveStreamManager() {
                     >
                       {form.series_id
                         ? series.find((s) => s.id === form.series_id)?.title
-                        : "Select Series..."}
+                        : "Standalone / No Series"}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -522,11 +522,11 @@ export default function LiveStreamManager() {
                           <CommandItem
                             value="none"
                             onSelect={() => {
-                              setForm(f => ({ ...f, series_id: "" }));
+                              setForm(f => ({ ...f, series_id: null }));
                             }}
                           >
                             <Check className={cn("mr-2 h-4 w-4", !form.series_id ? "opacity-100" : "opacity-0")} />
-                            No Series
+                            Standalone / No Series
                           </CommandItem>
                           {series.map((s) => (
                             <CommandItem

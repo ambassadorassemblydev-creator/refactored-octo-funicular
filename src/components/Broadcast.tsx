@@ -36,13 +36,18 @@ export default function Broadcast() {
     setLoading(true);
     setStatus(null);
 
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      toast.error("Broadcast request timed out. Please check the archive later.");
+    }, 30000); // 30 second safety net
+
     try {
       // 1. Get the session token from local storage or context
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
       // High IQ: Calling the main server API with the token
-      const response = await fetch(`${import.meta.env.VITE_MAIN_APP_URL || 'http://localhost:3000'}/api/notifications/broadcast`, {
+      const response = await fetch(`${import.meta.env.VITE_MAIN_APP_URL || 'https://theambassadorsassembly.org'}/api/notifications/broadcast`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
