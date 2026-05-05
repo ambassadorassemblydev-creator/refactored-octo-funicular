@@ -93,7 +93,11 @@ export default function Sermons({ onTabChange }: SermonsProps) {
       }
 
       if (seriesFilter !== "all") {
-        query = query.eq('series_id', seriesFilter);
+        if (seriesFilter === "none") {
+          query = query.is('series_id', null);
+        } else {
+          query = query.eq('series_id', seriesFilter);
+        }
       }
 
       const { data, error } = await query;
@@ -227,7 +231,9 @@ export default function Sermons({ onTabChange }: SermonsProps) {
               </div>
             </SelectTrigger>
             <SelectContent className="rounded-xl border-none shadow-2xl">
-              <SelectItem value="all">All Series</SelectItem>
+              <SelectItem value="all">All Archive</SelectItem>
+              <SelectItem value="none">Standalone Messages</SelectItem>
+              <SelectItem value="all" disabled className="text-[9px] opacity-50 font-bold uppercase tracking-widest px-2 py-1">Series</SelectItem>
               {/* Dynamic series list should be fetched, but for now we use the ones in data */}
               {Array.from(new Set(sermons.map(s => s.series_id).filter(Boolean))).map(id => {
                 const s = sermons.find(x => x.series_id === id);

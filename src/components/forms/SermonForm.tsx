@@ -84,7 +84,7 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
     const [seriesRes, speakersRes, profilesRes] = await Promise.all([
       supabase.from('sermon_series').select('id, title'),
       supabase.from('sermon_speakers').select('id, name'),
-      supabase.from('profiles').select('id, first_name, last_name').in('role_claim', ['pastor', 'leader', 'admin', 'super_admin'])
+      supabase.from('profiles').select('id, first_name, last_name')
     ]);
     setSeries(seriesRes.data || []);
     
@@ -303,9 +303,8 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                         !field.value && "text-muted-foreground"
                       )}
                     >
-                      {field.value && field.value !== "none"
-                        ? series.find((s) => s.id === field.value)?.title
-                        : "Select series..."}
+                      {field.value === "none" ? "Standalone / No Series" : 
+                       (field.value ? series.find((s) => s.id === field.value)?.title : "Select series...")}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </FormControl>
