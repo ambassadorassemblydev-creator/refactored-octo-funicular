@@ -68,16 +68,30 @@ export default function LiveStreamManager() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [streamsRes, speakersRes, seriesRes] = await Promise.all([
+    const [streamsRes, speakersRes, seriesRes, profilesRes] = await Promise.all([
       supabase.from("live_streams").select("*").order("scheduled_start", { ascending: false }),
       supabase.from("sermon_speakers").select("id, name").order("name"),
-      supabase.from("sermon_series").select("id, title").order("title")
+      supabase.from("sermon_series").select("id, title").order("title"),
+      supabase.from("profiles").select("id, first_name, last_name").order("first_name")
     ]);
 
     if (streamsRes.error) toast.error(streamsRes.error.message);
     else setStreams(streamsRes.data || []);
 
-    if (speakersRes.data) setSpeakers(speakersRes.data);
+    // Merge sermon_speakers and profiles
+    const profileSpeakers = (profilesRes.data || []).map(p => ({
+      id: p.id,
+      name: `${p.first_name} ${p.last_name}`
+    }));
+    
+    const allSpeakers = [...(speakersRes.data || [])];
+    profileSpeakers.forEach(ps => {
+      if (!allSpeakers.some(s => s.name === ps.name)) {
+        allSpeakers.push(ps);
+      }
+    });
+
+    setSpeakers(allSpeakers);
     if (seriesRes.data) setSeries(seriesRes.data);
     
     setLoading(false);
