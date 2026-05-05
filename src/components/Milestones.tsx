@@ -29,6 +29,8 @@ import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import SendEmailDialog from "./SendEmailDialog";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -53,6 +55,8 @@ export default function Milestones() {
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [emailDialog, setEmailDialog] = React.useState({ open: false, to: "", subject: "" });
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settings, setSettings] = React.useState({ bday: true, milestone: true });
 
   const fetchMilestones = async () => {
     setLoading(true);
@@ -178,7 +182,26 @@ export default function Milestones() {
 
   React.useEffect(() => {
     fetchMilestones();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from('church_settings').select('key, value').in('key', ['automated_birthday_emails', 'automated_milestone_emails']);
+    if (data) {
+      setSettings({
+        bday: data.find(s => s.key === 'automated_birthday_emails')?.value === 'true',
+        milestone: data.find(s => s.key === 'automated_milestone_emails')?.value === 'true'
+      });
+    }
+  };
+
+  const updateSetting = async (key: string, value: boolean) => {
+    const { error } = await supabase.from('church_settings').update({ value: String(value) }).eq('key', key);
+    if (!error) {
+      toast.success("Settings updated");
+      fetchSettings();
+    }
+  };
 
   const filteredMilestones = milestones.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase())
@@ -222,7 +245,10 @@ export default function Milestones() {
           </div>
           <p className="text-muted-foreground font-medium">Celebrate birthdays, anniversaries, and special achievements within the Ambassadors Assembly community.</p>
         </div>
-        <Button className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20">
+        <Button 
+          className="rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] gap-2 shadow-xl shadow-primary/20"
+          onClick={() => setSettingsOpen(true)}
+        >
           <Bell className="w-4 h-4" />
           Manage Notifications
         </Button>
@@ -313,7 +339,20 @@ export default function Milestones() {
                               <Phone className="w-4 h-4" />
                             </Button>
                           </div>
-                          <Button className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2 flex-1 sm:flex-none" onClick={() => toast.success(`Gift flow initiated for ${item.name}`)}>
+                          <Button 
+                            className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[10px] gap-2 flex-1 sm:flex-none" 
+                            onClick={() => {
+                              if (item.email) {
+                                setEmailDialog({
+                                  open: true,
+                                  to: item.email,
+                                  subject: `A Special Gift for Your ${item.type}!`
+                                });
+                              } else {
+                                toast.error("Member has no email on file");
+                              }
+                            }}
+                          >
                             <Gift className="w-4 h-4" />
                             <span className="hidden xs:inline">Send Gift</span>
                             <span className="xs:hidden">Gift</span>
@@ -389,6 +428,44 @@ export default function Milestones() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-[400px] rounded-[2rem] border-none shadow-2xl bg-card/95 backdrop-blur-xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">Notification Settings</DialogTitle>
+            <DialogDescription className="text-[10px] font-bold uppercase tracking-widest">
+              Control automated communications
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-6">
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30">
+              <div className="space-y-0.5">
+                <label className="text-sm font-bold">Birthday Greetings</label>
+                <p className="text-[10px] text-muted-foreground">Send automated emails on birthdays</p>
+              </div>
+              <Switch 
+                checked={settings.bday} 
+                onCheckedChange={(checked) => updateSetting('automated_birthday_emails', checked)} 
+              />
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30">
+              <div className="space-y-0.5">
+                <label className="text-sm font-bold">Milestone Greetings</label>
+                <p className="text-[10px] text-muted-foreground">Send emails for job promotions etc.</p>
+              </div>
+              <Switch 
+                checked={settings.milestone} 
+                onCheckedChange={(checked) => updateSetting('automated_milestone_emails', checked)} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button className="w-full rounded-xl h-12 font-bold uppercase tracking-widest text-[10px]" onClick={() => setSettingsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SendEmailDialog 
         open={emailDialog.open}

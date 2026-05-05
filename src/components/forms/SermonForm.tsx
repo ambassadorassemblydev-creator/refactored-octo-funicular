@@ -59,6 +59,7 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
   const [isSeriesPopoverOpen, setIsSeriesPopoverOpen] = React.useState(false);
   const [newSeriesTitle, setNewSeriesTitle] = React.useState("");
   const [creatingSeries, setCreatingSeries] = React.useState(false);
+  const [speakerSearch, setSpeakerSearch] = React.useState("");
 
   const form = useForm<SermonFormValues>({
     resolver: zodResolver(sermonSchema),
@@ -81,27 +82,32 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
   });
 
   const fetchData = async () => {
-    const [seriesRes, speakersRes, profilesRes] = await Promise.all([
-      supabase.from('sermon_series').select('id, title'),
-      supabase.from('sermon_speakers').select('id, name'),
-      supabase.from('profiles').select('id, first_name, last_name')
-    ]);
-    setSeries(seriesRes.data || []);
-    
-    // Merge sermon_speakers and profiles
-    const profileSpeakers = (profilesRes.data || []).map(p => ({
-      id: p.id,
-      name: `${p.first_name} ${p.last_name}`
-    }));
-    
-    const allSpeakers = [...(speakersRes.data || [])];
-    profileSpeakers.forEach(ps => {
-      if (!allSpeakers.some(s => s.name === ps.name)) {
-        allSpeakers.push(ps);
-      }
-    });
-    
-    setSpeakers(allSpeakers);
+    try {
+      const [seriesRes, speakersRes, profilesRes] = await Promise.all([
+        supabase.from('sermon_series').select('id, title'),
+        supabase.from('sermon_speakers').select('id, name'),
+        supabase.from('profiles').select('id, first_name, last_name')
+      ]);
+      setSeries(seriesRes.data || []);
+      
+      // Merge sermon_speakers and profiles
+      const profileSpeakers = (profilesRes.data || []).map(p => ({
+        id: p.id,
+        name: `${p.first_name} ${p.last_name}`
+      }));
+      
+      const allSpeakers = [...(speakersRes.data || [])];
+      profileSpeakers.forEach(ps => {
+        if (!allSpeakers.some(s => s.name === ps.name)) {
+          allSpeakers.push(ps);
+        }
+      });
+      
+      setSpeakers(allSpeakers);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      toast.error("Failed to load speakers or series");
+    }
   };
 
   React.useEffect(() => {
@@ -231,23 +237,28 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                   </PopoverTrigger>
                   <PopoverContent className="w-[250px] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search or type speaker..." />
+                      <CommandInput 
+                        placeholder="Search or type speaker..." 
+                        value={speakerSearch}
+                        onValueChange={setSpeakerSearch}
+                      />
                       <CommandList>
-                        <CommandEmpty>
-                          <Button 
-                            variant="ghost" 
-                            className="w-full justify-start text-primary font-bold text-xs h-8"
-                            onClick={() => {
-                              const searchInput = document.querySelector('[placeholder="Search or type speaker..."]') as HTMLInputElement;
-                              if (searchInput?.value) {
-                                field.onChange(searchInput.value);
-                              }
-                            }}
-                          >
-                            <Plus className="mr-2 h-3 w-3" />
-                            Add as new speaker
-                          </Button>
-                        </CommandEmpty>
+                        {speakerSearch && !speakers.some(s => s.name.toLowerCase() === speakerSearch.toLowerCase()) && (
+                          <CommandGroup>
+                            <CommandItem
+                              value={speakerSearch}
+                              onSelect={() => {
+                                field.onChange(speakerSearch);
+                                setIsSpeakerPopoverOpen(false);
+                                setSpeakerSearch("");
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add "{speakerSearch}" as new speaker
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                        <CommandEmpty>No speaker found.</CommandEmpty>
                         <CommandGroup>
                           {speakers.map((s) => (
                             <CommandItem
@@ -256,6 +267,7 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                               onSelect={() => {
                                 field.onChange(s.name);
                                 setIsSpeakerPopoverOpen(false);
+                                setSpeakerSearch("");
                               }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", field.value === s.name ? "opacity-100" : "opacity-0")} />
