@@ -144,10 +144,10 @@ export default function ApprovalsCenter() {
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('already_serving', true).eq('approval_status', 'pending'),
         supabase.from('volunteer_applications').select('*, church_departments(name), church_positions(title)').eq('status', 'pending'),
-        supabase.from('ministry_members').select('*, ministries(name), profiles:profiles!ministry_members_user_id_fkey(first_name, last_name, email, avatar_url)').eq('role', 'pending'),
+        supabase.from('ministry_members').select('*, ministries(name), profiles:profiles!ministry_members_user_id_fkey(first_name, last_name, email, avatar_url)').eq('is_active', false),
         supabase.from('testimonies').select('*').eq('is_approved', false),
         supabase.from('prayer_requests').select('id, title, description, requester_name, requester_email, created_at, is_urgent, category, recaptcha_score, is_public').eq('is_approved', false).is('approved_at', null),
-        supabase.from('event_registrations').select('*, events!inner(*), profiles:profiles!event_registrations_user_id_fkey(*)').eq('is_confirmed', false).eq('events.event_type', 'outreach'),
+        supabase.from('profiles').select('*').not('department_interest', 'is', null).eq('already_serving', false).eq('approval_status', 'approved'),
         supabase.from('roles').select('id, name'),
         supabase.from('church_departments').select('id, name'),
         supabase.from('church_positions').select('id, title')
@@ -204,7 +204,7 @@ export default function ApprovalsCenter() {
         case 'ministries':
           table = 'ministry_members';
           updateData = { 
-            status: action === 'approve' ? 'active' : 'rejected', 
+            is_active: action === 'approve', 
             role: action === 'approve' ? 'member' : 'rejected',
             ...auditInfo
           };
@@ -225,9 +225,8 @@ export default function ApprovalsCenter() {
           };
           break;
         case 'outreach':
-          table = 'event_registrations';
+          table = 'profiles';
           updateData = { 
-            is_confirmed: action === 'approve',
             ...auditInfo
           };
           break;
@@ -240,8 +239,13 @@ export default function ApprovalsCenter() {
         if (type === 'staff') {
           const targetRole = record._selectedRole || 'worker';
           
-          // Single source of truth: update role_claim on profiles
-          await supabase.from('profiles').update({ role_claim: targetRole }).eq('id', id);
+          // Single source of truth: update role_claim on profiles and CLEAR interests
+          await supabase.from('profiles').update({ 
+            role_claim: targetRole,
+            department_interest: null,
+            department_claim: null,
+            position_interest: null
+          }).eq('id', id);
 
           if (record.department_claim) {
             const matchedDept = departments.find(d => 
@@ -263,12 +267,37 @@ export default function ApprovalsCenter() {
               }, { onConflict: 'user_id' });
             }
           }
-        } else if (type === 'volunteers') {
-          // Promote worker status from probation to active
-          await supabase.from('church_workers')
-            .update({ status: 'active' })
-            .eq('user_id', record.user_id)
-            .eq('department_id', record.department_id);
+        } else if (type === 'volunteers' || type === 'outreach') {
+          // Promote worker status / Create worker record
+          const userId = type === 'volunteers' ? record.user_id : record.id;
+          const deptInterest = type === 'volunteers' ? record.department_id : record.department_interest;
+          
+          let targetDeptId = type === 'volunteers' ? record.department_id : null;
+          
+          if (type === 'outreach' && record.department_interest) {
+            const matchedDept = departments.find(d => 
+              d.name.toLowerCase().includes(record.department_interest.toLowerCase()) ||
+              record.department_interest.toLowerCase().includes(d.name.toLowerCase())
+            );
+            if (matchedDept) targetDeptId = matchedDept.id;
+          }
+
+          if (targetDeptId) {
+            await (supabase.from('church_workers') as any).upsert({
+              user_id: userId,
+              department_id: targetDeptId,
+              position_id: record._selectedPosition || null,
+              status: 'active',
+              employment_type: 'volunteer'
+            }, { onConflict: 'user_id' });
+          }
+
+          // Clear interest from profile
+          await supabase.from('profiles').update({ 
+            department_interest: null,
+            department_claim: null,
+            position_interest: null
+          }).eq('id', userId);
         }
       }
 
@@ -315,7 +344,7 @@ export default function ApprovalsCenter() {
             { id: "staff", label: "Staff", icon: Shield },
             { id: "volunteers", label: "Applications", icon: Users },
             { id: "ministries", label: "Ministry Joins", icon: HeartHandshake },
-            { id: "outreach", label: "Outreach Regs", icon: ExternalLink },
+            { id: "outreach", label: "Outreach Interests", icon: Heart },
             { id: "testimonies", label: "Testimonies", icon: MessageSquare },
             { id: "prayers", label: "Prayers", icon: MessageSquare },
           ].map((tab) => (
@@ -435,29 +464,57 @@ export default function ApprovalsCenter() {
               )}
             </TabsContent>
 
-            <TabsContent value="outreach" className="space-y-4">
-              {data.outreach.length === 0 ? <EmptyState icon={ExternalLink} title="No pending outreach registrations" /> : (
-                <div className="grid gap-4">
+            <TabsContent value="outreach" className="space-y-6">
+              {data.outreach.length === 0 ? (
+                <EmptyState icon={Heart} title="No outreach interests pending" />
+              ) : (
+                <div className="grid grid-cols-1 gap-6">
                   {data.outreach.map((item: any) => (
-                    <ApprovalCard 
-                      key={item.id} 
-                      title={item.guest_name || `${item.profiles?.first_name} ${item.profiles?.last_name}`}
-                      subtitle={item.guest_email || item.profiles?.email}
-                      meta={`Event: ${item.events?.title}`}
-                      avatar={item.profiles?.avatar_url}
+                    <ApprovalCard
+                      key={item.id}
+                      title={`${item.first_name || ''} ${item.last_name || ''}`}
+                      subtitle={item.email}
+                      meta="Outreach Interest"
+                      avatar={item.avatar_url}
                       onApprove={() => handleAction('outreach', item.id, 'approve', item)}
                       onReject={() => handleAction('outreach', item.id, 'reject', item)}
                     >
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs text-muted-foreground font-medium">Guests: {item.number_of_guests}</p>
-                        {item.notes && <p className="text-xs text-muted-foreground italic">"{item.notes}"</p>}
-                        <Badge variant="outline" className="mt-2 bg-blue-500/10 text-blue-600 border-none text-[8px] font-bold uppercase tracking-widest">{item.events?.event_type}</Badge>
+                  <div className="mt-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Interested In</p>
+                    <p className="text-sm font-medium">{item.department_interest}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-primary/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Confirm Placement:</span>
+                        <Select 
+                          value={item._selectedPosition} 
+                          onValueChange={(val) => {
+                            setData((prev: any) => ({
+                              ...prev,
+                              outreach: prev.outreach.map((o: any) => o.id === item.id ? { ...o, _selectedPosition: val } : o)
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-48 text-[10px] bg-background/50 border-none">
+                            <SelectValue placeholder="Select Position" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {positions
+                              .filter(p => !['Unit Leader', 'Volunteer'].includes(p.title))
+                              .map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </ApprovalCard>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
+                    </div>
+                  </div>
+                </ApprovalCard>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
             <TabsContent value="testimonies" className="space-y-4">
               {data.testimonies.length === 0 ? <EmptyState icon={MessageSquare} title="No pending testimonies" /> : (

@@ -18,6 +18,7 @@ import { supabase } from "@/src/lib/supabase";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { toast } from "sonner";
 import { motion } from "motion/react";
+import { cn } from "@/src/lib/utils";
 
 interface StreamForm {
   title: string;
@@ -450,7 +451,7 @@ export default function LiveStreamManager() {
               <div className="space-y-2 flex flex-col">
                 <Label>Speaker</Label>
                 <Popover>
-                  <PopoverTrigger asChild>
+                  <PopoverTrigger>
                     <Button
                       variant="outline"
                       role="combobox"
@@ -500,7 +501,7 @@ export default function LiveStreamManager() {
               <div className="space-y-2 flex flex-col">
                 <Label>Sermon Series</Label>
                 <Popover>
-                  <PopoverTrigger asChild>
+                  <PopoverTrigger>
                     <Button
                       variant="outline"
                       role="combobox"

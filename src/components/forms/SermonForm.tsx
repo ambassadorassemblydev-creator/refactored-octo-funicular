@@ -55,6 +55,8 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
   const [series, setSeries] = React.useState<any[]>([]);
   const [speakers, setSpeakers] = React.useState<any[]>([]);
   const [isSeriesDialogOpen, setIsSeriesDialogOpen] = React.useState(false);
+  const [isSpeakerPopoverOpen, setIsSpeakerPopoverOpen] = React.useState(false);
+  const [isSeriesPopoverOpen, setIsSeriesPopoverOpen] = React.useState(false);
   const [newSeriesTitle, setNewSeriesTitle] = React.useState("");
   const [creatingSeries, setCreatingSeries] = React.useState(false);
 
@@ -79,12 +81,27 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
   });
 
   const fetchData = async () => {
-    const [seriesRes, speakersRes] = await Promise.all([
+    const [seriesRes, speakersRes, profilesRes] = await Promise.all([
       supabase.from('sermon_series').select('id, title'),
-      supabase.from('sermon_speakers').select('id, name')
+      supabase.from('sermon_speakers').select('id, name'),
+      supabase.from('profiles').select('id, first_name, last_name').in('role_claim', ['pastor', 'leader', 'admin', 'super_admin'])
     ]);
     setSeries(seriesRes.data || []);
-    setSpeakers(speakersRes.data || []);
+    
+    // Merge sermon_speakers and profiles
+    const profileSpeakers = (profilesRes.data || []).map(p => ({
+      id: p.id,
+      name: `${p.first_name} ${p.last_name}`
+    }));
+    
+    const allSpeakers = [...(speakersRes.data || [])];
+    profileSpeakers.forEach(ps => {
+      if (!allSpeakers.some(s => s.name === ps.name)) {
+        allSpeakers.push(ps);
+      }
+    });
+    
+    setSpeakers(allSpeakers);
   };
 
   React.useEffect(() => {
@@ -196,8 +213,8 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel className="mb-1">Speaker</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
+                <Popover open={isSpeakerPopoverOpen} onOpenChange={setIsSpeakerPopoverOpen}>
+                  <PopoverTrigger>
                     <FormControl>
                       <Button
                         variant="outline"
@@ -238,6 +255,7 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                               value={s.name}
                               onSelect={() => {
                                 field.onChange(s.name);
+                                setIsSpeakerPopoverOpen(false);
                               }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", field.value === s.name ? "opacity-100" : "opacity-0")} />
@@ -274,8 +292,8 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel className="mb-1">Sermon Series</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
+              <Popover open={isSeriesPopoverOpen} onOpenChange={setIsSeriesPopoverOpen}>
+                <PopoverTrigger>
                   <FormControl>
                     <Button
                       variant="outline"
@@ -300,7 +318,10 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                       <CommandGroup>
                         <CommandItem
                           value="none"
-                          onSelect={() => field.onChange("none")}
+                          onSelect={() => {
+                            field.onChange("none");
+                            setIsSeriesPopoverOpen(false);
+                          }}
                         >
                           <Check className={cn("mr-2 h-4 w-4", field.value === "none" ? "opacity-100" : "opacity-0")} />
                           Standalone / No Series
@@ -309,7 +330,10 @@ export default function SermonForm({ initialData, onSuccess, onCancel }: SermonF
                           <CommandItem
                             key={s.id}
                             value={s.title}
-                            onSelect={() => field.onChange(s.id)}
+                            onSelect={() => {
+                            field.onChange(s.id);
+                            setIsSeriesPopoverOpen(false);
+                          }}
                           >
                             <Check className={cn("mr-2 h-4 w-4", field.value === s.id ? "opacity-100" : "opacity-0")} />
                             {s.title}

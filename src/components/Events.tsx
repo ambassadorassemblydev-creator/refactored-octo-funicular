@@ -144,7 +144,7 @@ export default function Events() {
             <Plus className="w-4 h-4" />
             Create Event
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Event</DialogTitle>
               <DialogDescription>Fill in the details for the new church event.</DialogDescription>
@@ -347,7 +347,7 @@ export default function Events() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
             <DialogDescription>Update the details for {editingEvent?.title}.</DialogDescription>

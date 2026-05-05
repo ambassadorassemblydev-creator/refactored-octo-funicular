@@ -39,7 +39,6 @@ const MINISTRY_ROLES = [
   "Team Member",
   "Worship Leader",
   "Coordinator",
-  "Volunteer",
   "Prayer Lead",
   "Secretary",
   "Treasurer",
@@ -63,6 +62,16 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
   const [selectedMinistry, setSelectedMinistry] = React.useState<any>(null);
   const [ministryMembers, setMinistryMembers] = React.useState<any[]>([]);
   const [membersLoading, setMembersLoading] = React.useState(false);
+  const [positions, setPositions] = React.useState<any[]>([]);
+
+  const fetchPositions = async () => {
+    const { data } = await supabase.from('church_positions').select('*').order('title');
+    setPositions(data || []);
+  };
+
+  React.useEffect(() => {
+    if (isDepartment) fetchPositions();
+  }, [isDepartment]);
 
   const fetchMinistries = async () => {
     setLoading(true);
@@ -109,14 +118,16 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
       const memberTable = isDepartment ? 'church_workers' : 'ministry_members';
       const idColumn = isDepartment ? 'department_id' : 'ministry_id';
       
-      const { data, error } = await supabase
-        .from(memberTable)
-        .select(`
-          *,
-          profiles!user_id (
-            id, first_name, last_name, avatar_url, email, phone, title
-          )${isDepartment ? ', church_positions!position_id ( title )' : ''}
-        `)
+      const selectQuery = `
+        *,
+        profiles!user_id (
+          id, first_name, last_name, avatar_url, email, phone, title
+        )${isDepartment ? ', church_positions!position_id ( title )' : ''}
+      `;
+
+      const { data, error } = await (supabase
+        .from(memberTable as any)
+        .select(selectQuery) as any)
         .eq(idColumn as any, ministry.id)
         .order('created_at', { ascending: true });
 
@@ -134,29 +145,23 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
     }
   };
 
-  const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+  const handleUpdateMemberRole = async (memberId: string, newRoleOrPositionId: string) => {
     try {
       const memberTable = isDepartment ? 'church_workers' : 'ministry_members';
-      // For church_workers, we might need to update status or position, but let's assume 'role' for now if they have it, 
-      // or just update ministry_members if that's what's intended.
-      // Actually, church_workers doesn't have 'role'. 
-      if (isDepartment) {
-        toast.info("Role updates for department workers are managed via HR");
-        return;
-      }
-
+      const updateData = isDepartment ? { position_id: newRoleOrPositionId } : { role: newRoleOrPositionId };
+      
       const { error } = await supabase
-        .from('ministry_members')
-        .update({ role: newRole })
+        .from(memberTable)
+        .update(updateData)
         .eq('id', memberId);
       if (error) throw error;
 
       await auditRepo.logAction({
         admin_id: user?.id || 'unknown',
         action: 'UPDATE',
-        table_name: 'ministry_members',
+        table_name: memberTable,
         record_id: memberId,
-        new_values: { role: newRole }
+        new_values: updateData
       });
 
       toast.success("Role updated");
@@ -165,20 +170,36 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
       toast.error(err.message);
     }
   };
+
   const handleUpdateMemberStatus = async (memberId: string, newStatus: string) => {
     try {
+      const memberTable = isDepartment ? 'church_workers' : 'ministry_members';
+      const updateData = isDepartment ? { status: newStatus } : { is_active: newStatus === 'active' };
+
       const { error } = await supabase
-        .from('ministry_members')
-        .update({ is_active: newStatus === 'active' })
+        .from(memberTable)
+        .update(updateData)
         .eq('id', memberId);
       if (error) throw error;
-      
+
+      // High IQ: If approved, clear the interest fields on the profile to sync dashboard
+      if (newStatus === 'active') {
+        const member = ministryMembers.find(m => m.id === memberId);
+        if (member && member.user_id) {
+          await supabase.from('profiles').update({
+            department_interest: null,
+            department_claim: null,
+            position_interest: null
+          }).eq('id', member.user_id);
+        }
+      }
+
       await auditRepo.logAction({
         admin_id: user?.id || 'unknown',
         action: 'UPDATE',
-        table_name: 'ministry_members',
+        table_name: memberTable,
         record_id: memberId,
-        new_values: { is_active: newStatus === 'active' }
+        new_values: updateData
       });
 
       toast.success("Status updated");
@@ -286,7 +307,7 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
             </p>
             <p className="text-4xl font-black">{ministryMembers.length}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {ministryMembers.filter(m => m.status === 'active').length} active · {ministryMembers.filter(m => m.status === 'pending').length} pending
+              {ministryMembers.filter(m => isDepartment ? m.status === 'active' : m.is_active).length} active · {ministryMembers.filter(m => isDepartment ? m.status === 'pending' : !m.is_active).length} pending
             </p>
           </Card>
         </div>
@@ -348,20 +369,35 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
                       </div>
 
                       {/* Role — editable */}
-                      <Select value={member.role || ""} onValueChange={(val) => handleUpdateMemberRole(member.id, val)}>
+                      <Select 
+                        value={isDepartment ? member.position_id || "" : member.role || ""} 
+                        onValueChange={(val) => handleUpdateMemberRole(member.id, val)}
+                      >
                         <SelectTrigger className="h-8 text-xs rounded-lg border-none bg-muted/50 w-full max-w-[160px]">
-                          <SelectValue placeholder="Set role" />
+                          <SelectValue placeholder={isDepartment ? "Set Position" : "Set Role"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {MINISTRY_ROLES.map(r => (
-                            <SelectItem key={r} value={r}>{r}</SelectItem>
-                          ))}
+                          {isDepartment ? (
+                            positions
+                              .filter(p => !['Unit Leader', 'Volunteer'].includes(p.title))
+                              .map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                              ))
+                          ) : (
+                            MINISTRY_ROLES.map(r => (
+                              <SelectItem key={r} value={r}>{r}</SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
 
                       {/* Status — editable */}
-                      <Select value={member.status || "pending"} onValueChange={(val) => handleUpdateMemberStatus(member.id, val)}>
-                        <SelectTrigger className={cn("h-8 text-[10px] font-bold uppercase rounded-lg border-none w-full max-w-[120px]", statusColor(member.status))}>
+                      <Select 
+                        value={isDepartment ? member.status || "pending" : (member.is_active ? "active" : "pending")} 
+                        onValueChange={(val) => handleUpdateMemberStatus(member.id, val)}
+                      >
+                        <SelectTrigger className={cn("h-8 text-[10px] font-bold uppercase rounded-lg border-none w-full max-w-[120px]", 
+                          statusColor(isDepartment ? member.status : (member.is_active ? "active" : "pending")))}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

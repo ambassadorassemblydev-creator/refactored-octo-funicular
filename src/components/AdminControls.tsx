@@ -238,11 +238,18 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
     if (userSearch.length < 2) return;
     setSearchingUsers(true);
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
-        .or(`first_name.ilike.%${userSearch}%,last_name.ilike.%${userSearch}%,email.ilike.%${userSearch}%`)
-        .limit(5);
+      const parts = userSearch.split(' ').filter(Boolean);
+      let query = supabase.from('profiles').select('id, first_name, last_name, email, avatar_url');
+      
+      if (parts.length > 1) {
+        // Full name search: match both first and last name
+        query = query.filter('first_name', 'ilike', `%${parts[0]}%`).filter('last_name', 'ilike', `%${parts[1]}%`);
+      } else {
+        // Single term search: check all fields
+        query = query.or(`first_name.ilike.%${userSearch}%,last_name.ilike.%${userSearch}%,email.ilike.%${userSearch}%,role_claim.ilike.%${userSearch}%`);
+      }
+      
+      const { data } = await query.limit(10);
       setFoundUsers(data || []);
     } catch (err) {
       console.error(err);
