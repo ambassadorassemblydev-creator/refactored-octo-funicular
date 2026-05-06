@@ -184,13 +184,23 @@ export default function Ministries({ type = "ministry", onTabChange }: Ministrie
 
       // High IQ: If approved, clear the interest fields on the profile to sync dashboard
       if (newStatus === 'active') {
-        const member = ministryMembers.find(m => m.id === memberId);
-        if (member && member.user_id) {
-          await supabase.from('profiles').update({
+        const memberRecord = ministryMembers.find(m => m.id === memberId);
+        if (memberRecord && memberRecord.user_id) {
+          const updateFields: any = {
             department_interest: null,
             department_claim: null,
             position_interest: null
-          }).eq('id', member.user_id);
+          };
+
+          if (isDepartment) {
+            // Sync department name to profile cache
+            updateFields.department = selectedMinistry.name;
+          } else {
+            // Sync ministry name to profile cache
+            updateFields.ministry = selectedMinistry.name;
+          }
+
+          await supabase.from('profiles').update(updateFields).eq('id', memberRecord.user_id);
         }
       }
 

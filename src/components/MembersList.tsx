@@ -117,6 +117,10 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
         is_member: true,
         approved_by: user?.id,
         approved_at: new Date().toISOString(),
+        // Clear transient interests
+        department_interest: null,
+        department_claim: null,
+        position_interest: null
       };
 
       // Handle Department & Position Claim
@@ -147,7 +151,7 @@ export default function MembersList({ onTabChange }: { onTabChange?: (tab: strin
       }
 
       // Set Title if claiming pastoral role
-      if (profile.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(profile.role_claim)) {
+      if (['pastor', 'admin', 'super_admin'].includes(targetRole) && profile.role_claim && ['Pastor','Bishop','Apostle','Prophet','Evangelist'].includes(profile.role_claim)) {
         updateData.title = profile.role_claim;
       }
 

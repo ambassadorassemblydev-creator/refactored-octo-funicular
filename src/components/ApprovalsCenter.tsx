@@ -239,8 +239,15 @@ export default function ApprovalsCenter() {
       const { error: updateError } = await supabase.from(table as any).update(updateData).eq('id', id);
       if (updateError) throw updateError;
 
-      if ((type === 'staff' || type === 'volunteers' || type === 'outreach') && action === 'approve') {
-        if (type === 'staff') {
+      if ((type === 'staff' || type === 'volunteers' || type === 'outreach' || type === 'ministries') && action === 'approve') {
+        if (type === 'ministries') {
+          // Sync ministry name to profile cache
+          const userId = record.user_id;
+          const ministryName = record.ministries?.name;
+          if (ministryName) {
+            await supabase.from('profiles').update({ ministry: ministryName }).eq('id', userId);
+          }
+        } else if (type === 'staff') {
           const targetRole = record._selectedRole || 'worker';
           
           // Single source of truth: update role_claim on profiles and CLEAR interests
@@ -263,6 +270,11 @@ export default function ApprovalsCenter() {
                 record.position_interest?.toLowerCase().includes(p.title.toLowerCase())
               );
 
+              // Update profile with department name
+              await supabase.from('profiles').update({ 
+                department: matchedDept.name 
+              }).eq('id', id);
+
               await (supabase.from('church_workers') as any).upsert({
                 user_id: id,
                 department_id: matchedDept.id,
@@ -277,13 +289,17 @@ export default function ApprovalsCenter() {
           const deptInterest = type === 'volunteers' ? record.department_id : record.department_interest;
           
           let targetDeptId = type === 'volunteers' ? record.department_id : null;
+          let targetDeptName = type === 'volunteers' ? record.church_departments?.name : null;
           
           if (type === 'outreach' && record.department_interest) {
             const matchedDept = departments.find(d => 
               d.name.toLowerCase().includes(record.department_interest.toLowerCase()) ||
               record.department_interest.toLowerCase().includes(d.name.toLowerCase())
             );
-            if (matchedDept) targetDeptId = matchedDept.id;
+            if (matchedDept) {
+              targetDeptId = matchedDept.id;
+              targetDeptName = matchedDept.name;
+            }
           }
 
           if (targetDeptId) {
@@ -296,8 +312,13 @@ export default function ApprovalsCenter() {
             }, { onConflict: 'user_id' });
           }
 
-          // Clear interest from profile
+          // Find position title for profile update
+          const posTitle = positions.find(p => p.id === record._selectedPosition)?.title || 'Member';
+
+          // Clear interest from profile AND set official department/role
           await supabase.from('profiles').update({ 
+            department: targetDeptName || record.department_claim,
+            role_claim: 'worker',
             department_interest: null,
             department_claim: null,
             position_interest: null
