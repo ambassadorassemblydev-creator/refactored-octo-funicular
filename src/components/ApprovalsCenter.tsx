@@ -143,12 +143,12 @@ export default function ApprovalsCenter() {
         { data: dData },
         { data: pData }
       ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('already_serving', true).eq('approval_status', 'pending'),
+        supabase.from('profiles').select('*').eq('already_serving', true).in('approval_status', ['pending', 'none']),
         supabase.from('volunteer_applications').select('*, church_departments(name), church_positions(title)').eq('status', 'pending'),
         supabase.from('ministry_members').select('*, ministries(name), profiles:profiles!ministry_members_user_id_fkey(first_name, last_name, email, avatar_url)').eq('is_active', false),
         supabase.from('testimonies').select('*').eq('is_approved', false),
         supabase.from('prayer_requests').select('id, title, description, requester_name, requester_email, created_at, is_urgent, category, recaptcha_score, is_public').eq('is_approved', false).is('approved_at', null),
-        supabase.from('profiles').select('*').not('department_interest', 'is', null).eq('already_serving', false).eq('approval_status', 'approved'),
+        supabase.from('profiles').select('*').not('department_interest', 'is', null).eq('already_serving', false).in('approval_status', ['approved', 'none']),
         supabase.from('roles').select('id, name'),
         supabase.from('church_departments').select('id, name'),
         supabase.from('church_positions').select('id, title')
