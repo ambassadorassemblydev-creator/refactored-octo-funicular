@@ -178,12 +178,13 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
     { id: "admin-roles", icon: ShieldCheck, label: "Roles", category: "System" },
     { id: "admin-system", icon: Server, label: "System Status", category: "System" },
     { id: "admin-audit", icon: History, label: "Audit Logs", category: "System" },
+    { id: "admin-emails", icon: Mail, label: "Email History", category: "System" },
     { id: "reports", icon: FileText, label: "Reports", category: "System" },
     { id: "notifications", icon: Bell, label: "Notifications", category: "System" },
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
-    if (["donations", "giving-goals", "reports", "admin-settings", "admin-roles", "admin-system", "admin-audit", "broadcast", "structure"].includes(item.id)) {
+    if (["donations", "giving-goals", "reports", "admin-settings", "admin-roles", "admin-system", "admin-audit", "admin-emails", "broadcast", "structure"].includes(item.id)) {
       return role === 'admin' || role === 'super_admin' || role === 'pastor';
     }
     if (item.id === "approvals") {

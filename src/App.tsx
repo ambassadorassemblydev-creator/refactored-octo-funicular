@@ -37,6 +37,7 @@ import ApprovalsCenter from "./components/ApprovalsCenter";
 import StructureManagement from "./components/StructureManagement";
 import Broadcast from "./components/Broadcast";
 import Notifications from "./components/Notifications";
+import EmailLogs from "./components/EmailLogs";
 import { Toaster } from "sonner";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -225,15 +226,17 @@ function AppContent() {
       case "profile":
         return <ProfileSettings />;
       case "admin":
-        return <AdminControls />;
+        return <AdminControls onTabChange={handleTabChange} />;
       case "admin-settings":
-        return <AdminControls defaultTab="general" />;
+        return <AdminControls defaultTab="general" onTabChange={handleTabChange} />;
       case "admin-roles":
-        return <AdminControls defaultTab="roles" />;
+        return <AdminControls defaultTab="roles" onTabChange={handleTabChange} />;
       case "admin-system":
-        return <AdminControls defaultTab="system" />;
+        return <AdminControls defaultTab="system" onTabChange={handleTabChange} />;
       case "admin-audit":
-        return <AdminControls defaultTab="audit" />;
+        return <AdminControls defaultTab="audit" onTabChange={handleTabChange} />;
+      case "admin-emails":
+        return (role === 'admin' || role === 'super_admin' || role === 'pastor') ? <EmailLogs /> : <Dashboard onTabChange={handleTabChange} />;
       case "ministries":
         return <Ministries onTabChange={handleTabChange} />;
       case "departments":

@@ -54,7 +54,7 @@ function SettingRow({ label, description, settingKey, settings, onChange }: { la
   );
 }
 
-export default function AdminControls({ defaultTab = "general" }: { defaultTab?: string }) {
+export default function AdminControls({ defaultTab = "general", onTabChange }: { defaultTab?: string, onTabChange?: (tab: string) => void }) {
   const { user, role, loading: authLoading } = useAuth();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -612,9 +612,19 @@ export default function AdminControls({ defaultTab = "general" }: { defaultTab?:
         {/* ── EMAIL ── */}
         <TabsContent value="email">
           <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm rounded-3xl overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold">Email Configuration</CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase tracking-widest">Sender name and address used for church emails (via Resend)</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-bold">Email Configuration</CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase tracking-widest">Sender name and address used for church emails (via Resend)</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                className="rounded-xl h-10 px-4 font-bold uppercase tracking-widest text-[9px] gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                onClick={() => onTabChange ? onTabChange('admin-emails') : window.location.href = '/admin-emails'}
+              >
+                <History className="w-3.5 h-3.5" />
+                View Delivery Logs
+              </Button>
             </CardHeader>
             <CardContent className="space-y-5">
               {!loading && (
