@@ -299,7 +299,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
               animate={{ opacity: 1, x: 0 }}
               className="flex flex-col"
             >
-              <span className="font-bold text-lg leading-tight tracking-tight">Ambassadors</span>
+              <span className="font-bold text-lg leading-tight tracking-tight">The Ambassadors</span>
               <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-semibold">Assembly</span>
             </motion.div>
           )}
@@ -367,7 +367,7 @@ export default function Layout({ children, onTabChange, activeTab }: { children:
                     <ShieldCheck className="w-6 h-6 text-primary-foreground" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-bold text-lg leading-tight">Ambassadors</span>
+                    <span className="font-bold text-lg leading-tight">The Ambassadors</span>
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Assembly</span>
                   </div>
                 </div>

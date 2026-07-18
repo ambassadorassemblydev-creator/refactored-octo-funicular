@@ -96,7 +96,7 @@ export default function Broadcast() {
           Push Broadcast Center
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base max-w-2xl">
-          Instantly reach every member of the Ambassadors Assembly directly on their mobile device or workstation.
+          Instantly reach every member of The Ambassadors Assembly directly on their mobile device or workstation.
         </p>
       </div>
 
@@ -183,7 +183,7 @@ export default function Broadcast() {
                 </div>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Ambassadors</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">The Ambassadors</p>
                     <p className="text-[8px] text-white/40">NOW</p>
                   </div>
                   <p className="text-sm font-bold leading-none">{title || "Your Title Here"}</p>

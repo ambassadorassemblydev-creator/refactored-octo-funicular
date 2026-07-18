@@ -82,19 +82,19 @@ export default function AILab() {
 
       switch (type) {
         case "sermon":
-          systemInstruction = "You are an expert theologian and speaker for Ambassadors Assembly. Generate a detailed sermon outline including a title, key scriptures, 3 main points with illustrations, and a closing prayer.";
+          systemInstruction = "You are an expert theologian and speaker for The Ambassadors Assembly. Generate a detailed sermon outline including a title, key scriptures, 3 main points with illustrations, and a closing prayer.";
           userPrompt = prompt || "Generate a sermon about faith and perseverance.";
           break;
         case "social":
-          systemInstruction = "You are a social media manager for Ambassadors Assembly. Generate 3 engaging Instagram/Facebook posts with emojis and hashtags based on the provided topic.";
+          systemInstruction = "You are a social media manager for The Ambassadors Assembly. Generate 3 engaging Instagram/Facebook posts with emojis and hashtags based on the provided topic.";
           userPrompt = prompt || "Upcoming Sunday service invitation.";
           break;
         case "newsletter":
-          systemInstruction = "You are a communications director for Ambassadors Assembly. Write a warm, encouraging weekly newsletter intro and 3 key announcements.";
+          systemInstruction = "You are a communications director for The Ambassadors Assembly. Write a warm, encouraging weekly newsletter intro and 3 key announcements.";
           userPrompt = prompt || "Weekly update for the congregation.";
           break;
         default:
-          systemInstruction = "You are a helpful assistant for Ambassadors Assembly church administration.";
+          systemInstruction = "You are a helpful assistant for The Ambassadors Assembly church administration.";
       }
 
       const response = await ai.models.generateContent({
