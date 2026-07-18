@@ -98,7 +98,7 @@ function AppContent() {
           <div className="flex flex-col items-center gap-2 w-full">
             <h1 className="text-lg sm:text-4xl md:text-5xl font-black tracking-tighter text-white flex flex-wrap justify-center items-center gap-1 px-2 text-center leading-tight">
               <div className="flex items-center gap-0.5 sm:gap-1 flex-wrap justify-center">
-                { "AMBASSADORS".split("").map((char, i) => (
+                { "THE AMBASSADORS".split("").map((char, i) => (
                   <motion.span
                     key={i}
                     initial={{ opacity: 0, y: 10 }}
@@ -136,7 +136,7 @@ function AppContent() {
               transition={{ delay: 1.5, duration: 1 }}
               className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.3em] sm:tracking-[0.4em] text-white mt-6 sm:mt-8 text-center"
             >
-              Initializing Secure Infrastructure
+              Secure Infrastructure
             </motion.p>
           </div>
         </motion.div>

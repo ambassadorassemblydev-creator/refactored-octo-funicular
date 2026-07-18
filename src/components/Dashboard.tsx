@@ -336,7 +336,7 @@ export default function Dashboard({ onTabChange }: DashboardProps) {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-bold uppercase tracking-widest">
               <Zap className="w-3 h-3 fill-current" />
-              Ambassadors Assembly Panel
+              The Ambassadors Assembly Panel
             </div>
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-tight">
               Welcome back,<br /> 
